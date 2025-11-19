@@ -1,0 +1,2 @@
+src_typ/assets/* !text !filter !merge !diff
+src_typ/output.png !text !filter !merge !diff
