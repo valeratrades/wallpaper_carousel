@@ -1,3 +1,6 @@
+> [!WARNING]
+> NB: works exclusively on `sway`
+
 # wallpaper_carousel
 ![Minimum Supported Rust Version](https://img.shields.io/badge/nightly-1.93+-ab6000.svg)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/wallpaper_carousel.svg?color=fc8d62&logo=rust" height="20" style=flat-square>](https://crates.io/crates/wallpaper_carousel)
@@ -7,6 +10,7 @@
 [<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/valeratrades/wallpaper_carousel/errors.yml?branch=master&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/valeratrades/wallpaper_carousel/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
 [<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/valeratrades/wallpaper_carousel/warnings.yml?branch=master&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/valeratrades/wallpaper_carousel/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
 
+extend wallpaper with some random things I care about. Not generalizable in the slightest, only intended to be used by me myself exclusively.
 
 
 
