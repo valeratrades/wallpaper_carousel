@@ -1,11 +1,37 @@
 use std::process::Command;
 
 use color_eyre::eyre::{Result, WrapErr as _, bail};
+use serde::{Deserialize, Deserializer};
 use v_utils::{io::ExpandedPath, macros::MyConfigPrimitives};
 
 #[derive(Clone, Debug, Default, MyConfigPrimitives)]
 pub struct AppConfig {
-	pub quotes: Vec<String>,
+	pub quotes: Vec<Quote>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Quote {
+	pub text: String,
+	pub author: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for Quote {
+	fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+	where
+		D: Deserializer<'de>, {
+		#[derive(Deserialize)]
+		#[serde(untagged)]
+		enum QuoteHelper {
+			String(String),
+			Structured { text: String, author: Option<String> },
+		}
+
+		let helper = QuoteHelper::deserialize(deserializer)?;
+		Ok(match helper {
+			QuoteHelper::String(text) => Quote { text, author: None },
+			QuoteHelper::Structured { text, author } => Quote { text, author },
+		})
+	}
 }
 
 impl AppConfig {

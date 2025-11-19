@@ -34,6 +34,8 @@ fn main() -> Result<()> {
 
 	// Select a random quote
 	let quote = config.quotes.choose(&mut rand::thread_rng()).ok_or_else(|| color_eyre::eyre::eyre!("No quotes configured"))?;
+	println!("Selected quote: {:?}", quote.text);
+	println!("Author: {:?}", quote.author);
 
 	// Get display resolution from swaymsg
 	let (display_width, display_height) = get_display_resolution()?;
@@ -45,7 +47,7 @@ fn main() -> Result<()> {
 	resized_img.save(&temp_bg_path)?;
 
 	// Generate SVG with background image and text overlay
-	let svg_content = generate_svg(&temp_bg_path, quote, display_width, display_height)?;
+	let svg_content = generate_svg(&temp_bg_path, &quote.text, quote.author.as_deref(), display_width, display_height)?;
 
 	// Debug: save SVG for inspection
 	let svg_debug_path = v_utils::xdg_state_file!("debug.svg");
@@ -94,7 +96,7 @@ fn resize_fill(img: image::DynamicImage, target_width: u32, target_height: u32) 
 	DynamicImage::ImageRgba8(imageops::crop_imm(&resized.to_rgba8(), x_offset, y_offset, target_width, target_height).to_image())
 }
 
-fn generate_svg(bg_image_path: &PathBuf, text: &str, width: u32, height: u32) -> Result<String> {
+fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, width: u32, height: u32) -> Result<String> {
 	// Escape HTML entities in text
 	let escaped_text = text
 		.replace('&', "&amp;")
@@ -112,6 +114,26 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, width: u32, height: u32) ->
 		.collect::<Vec<_>>()
 		.join("\n      ");
 
+	// Calculate approximate y position for quote text (centered vertically)
+	let quote_y = height / 2;
+
+	// Calculate y position for author (below the quote, accounting for number of lines)
+	let line_height = 36; // 28px * 1.3 ≈ 36
+	let quote_height = lines.len() as u32 * line_height;
+	let author_y = quote_y + quote_height + 20; // 20px gap below quote
+
+	let author_element = if let Some(author) = author {
+		let escaped_author = author
+			.replace('&', "&amp;")
+			.replace('<', "&lt;")
+			.replace('>', "&gt;")
+			.replace('"', "&quot;")
+			.replace('\'', "&apos;");
+		format!(r#"<text class="author" x="{}" y="{}">{} {}</text>"#, width / 2 + 40, author_y, "©", escaped_author)
+	} else {
+		String::new()
+	};
+
 	let svg = format!(
 		r#"<?xml version="1.0" encoding="UTF-8"?>
 <svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -127,17 +149,24 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, width: u32, height: u32) ->
         fill: white;
         text-anchor: start;
       }}
+      .author {{
+        font-family: 'DejaVu Sans Mono', monospace;
+        font-size: 21px;
+        fill: white;
+        text-anchor: start;
+      }}
     </style>
   </defs>
   <image href="file://{}" x="0" y="0" width="{width}" height="{height}" />
   <text class="quote" x="{}" y="{}">
       {tspan_elements}
   </text>
+  {author_element}
 </svg>"#,
 		std::env::current_dir()?.join("assets/DejaVuSansMono.ttf").display(),
 		bg_image_path.display(),
 		width / 2 + 40,
-		height / 2,
+		quote_y,
 	);
 
 	Ok(svg)
