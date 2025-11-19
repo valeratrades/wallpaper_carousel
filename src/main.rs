@@ -71,6 +71,17 @@ fn run() -> Result<()> {
 	let quote = config.quotes.choose(&mut rand::thread_rng()).ok_or_else(|| color_eyre::eyre::eyre!("No quotes configured"))?;
 	println!("Selected quote: {:?}", quote.text);
 	println!("Author: {:?}", quote.author);
+
+	// Get balance value if configured
+	let balance_text = if let Some(balance) = &config.balance {
+		let value = balance.get_value()?;
+		let label = balance.label.as_deref().unwrap_or("Balance");
+		println!("{}: {}", label, value);
+		Some(format!("{}: {}", label, value))
+	} else {
+		None
+	};
+
 	println!("Generating CSS...");
 
 	// Get display resolution from swaymsg
@@ -83,7 +94,7 @@ fn run() -> Result<()> {
 	resized_img.save(&temp_bg_path)?;
 
 	// Generate SVG with background image and text overlay
-	let svg_content = generate_svg(&temp_bg_path, &quote.text, quote.author.as_deref(), display_width, display_height)?;
+	let svg_content = generate_svg(&temp_bg_path, &quote.text, quote.author.as_deref(), balance_text.as_deref(), display_width, display_height)?;
 
 	// Debug: save SVG for inspection
 	let svg_debug_path = v_utils::xdg_state_file!("debug.svg");
@@ -136,7 +147,7 @@ fn resize_fill(img: image::DynamicImage, target_width: u32, target_height: u32) 
 	DynamicImage::ImageRgba8(imageops::crop_imm(&resized.to_rgba8(), x_offset, y_offset, target_width, target_height).to_image())
 }
 
-fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, width: u32, height: u32) -> Result<String> {
+fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balance: Option<&str>, width: u32, height: u32) -> Result<String> {
 	// Escape HTML entities in text
 	let escaped_text = text
 		.replace('&', "&amp;")
@@ -184,6 +195,36 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, width
 		String::new()
 	};
 
+	let balance_element = if let Some(balance) = balance {
+		let escaped_balance = balance
+			.replace('&', "&amp;")
+			.replace('<', "&lt;")
+			.replace('>', "&gt;")
+			.replace('"', "&quot;")
+			.replace('\'', "&apos;");
+
+		// Split balance into lines and create tspan elements
+		let balance_lines: Vec<&str> = escaped_balance.lines().collect();
+		let balance_x = 40;
+		let balance_y = 60;
+
+		let balance_tspans: String = balance_lines
+			.iter()
+			.enumerate()
+			.map(|(i, line)| format!(r#"<tspan x="{}" dy="{}">{}</tspan>"#, balance_x, if i == 0 { "0" } else { "1.3em" }, line))
+			.collect::<Vec<_>>()
+			.join("\n      ");
+
+		format!(
+			r#"<text class="balance" x="{}" y="{}">
+      {}
+  </text>"#,
+			balance_x, balance_y, balance_tspans
+		)
+	} else {
+		String::new()
+	};
+
 	let svg = format!(
 		r#"<?xml version="1.0" encoding="UTF-8"?>
 <svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -201,9 +242,17 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, width
         fill: white;
         text-anchor: end;
       }}
+      .balance {{
+        font-family: 'DejaVu Sans Mono';
+        font-size: 20px;
+        fill: white;
+        text-anchor: start;
+        white-space: pre;
+      }}
     </style>
   </defs>
   <image href="file://{}" x="0" y="0" width="{width}" height="{height}" />
+  {balance_element}
   <text class="quote" x="{}" y="{}">
       {tspan_elements}
   </text>

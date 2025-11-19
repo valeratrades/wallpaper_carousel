@@ -7,6 +7,27 @@ use v_utils::{io::ExpandedPath, macros::MyConfigPrimitives};
 #[derive(Clone, Debug, Default, MyConfigPrimitives)]
 pub struct AppConfig {
 	pub quotes: Vec<Quote>,
+	pub balance: Option<Balance>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Balance {
+	pub command: String,
+	pub label: Option<String>,
+}
+
+impl Balance {
+	pub fn get_value(&self) -> Result<String> {
+		let output = Command::new("sh").arg("-c").arg(&self.command).output().wrap_err("Failed to execute balance command")?;
+
+		if !output.status.success() {
+			let stderr = String::from_utf8_lossy(&output.stderr);
+			bail!("Balance command failed: {}", stderr);
+		}
+
+		let stdout = String::from_utf8(output.stdout)?;
+		Ok(stdout.trim().to_string())
+	}
 }
 
 #[derive(Clone, Debug)]

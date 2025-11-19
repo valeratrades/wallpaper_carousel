@@ -6,4 +6,8 @@
 
     "fuck your feelings,\ndo the work"
   ];
+  balance = {
+    command = "rm_engine balance";
+    label = "Balance";
+  };
 }
