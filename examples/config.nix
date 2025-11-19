@@ -1,19 +1,9 @@
 {
   quotes = [
-    ''
-EV compounds,
-embarrassment doesn't
-    ''
+    "EV compounds,\nembarrassment doesn't"
 
-    "iteration speed"
+    { text = "iteration speed"; author = "Alex Hormozi"; }
 
-    {
-        text = "iteration speed";
-        author = "Alex Hormozi";
-    }
-
-    ''
-fuck your feelings,
-do the work''
+    "fuck your feelings,\ndo the work"
   ];
 }

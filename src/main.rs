@@ -4,14 +4,15 @@ use clap::Parser;
 use color_eyre::Result;
 use rand::seq::SliceRandom;
 use serde::Deserialize;
+use v_utils::utils::eyre::exit_on_error;
 use wallpaper_carousel::config::AppConfig;
 
 #[derive(Debug, Parser)]
 #[command(name = "wallpaper_carousel")]
 #[command(about = "Extend wallpaper with citation overlays")]
 struct Args {
-	/// Path to input image file (jpg or png)
-	input: PathBuf,
+	/// Path to input image file (jpg or png). If not provided, uses the last input file from cache.
+	input: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -25,9 +26,43 @@ struct CurrentMode {
 	height: u32,
 }
 
-fn main() -> Result<()> {
+fn get_cache_file_path() -> PathBuf {
+	v_utils::xdg_cache_file!("last_input.txt")
+}
+
+fn save_last_input(path: &PathBuf) -> Result<()> {
+	let cache_path = get_cache_file_path();
+	if let Some(parent) = cache_path.parent() {
+		std::fs::create_dir_all(parent)?;
+	}
+	std::fs::write(&cache_path, path.to_string_lossy().as_bytes())?;
+	Ok(())
+}
+
+fn load_last_input() -> Result<PathBuf> {
+	let cache_path = get_cache_file_path();
+	let content = std::fs::read_to_string(&cache_path).map_err(|_| {
+		color_eyre::eyre::eyre!(
+			"No input file provided and no cached input file found.\n\
+			Please provide an input file: wallpaper_carousel <path-to-image>"
+		)
+	})?;
+	Ok(PathBuf::from(content.trim()))
+}
+
+fn main() {
+	exit_on_error(run());
+}
+
+fn run() -> Result<()> {
 	color_eyre::install()?;
 	let args = Args::parse();
+
+	// Determine input path: use provided arg or load from cache
+	let input_path = match args.input {
+		Some(path) => path,
+		None => load_last_input()?,
+	};
 
 	// Load config
 	let config = AppConfig::read(None)?;
@@ -36,13 +71,14 @@ fn main() -> Result<()> {
 	let quote = config.quotes.choose(&mut rand::thread_rng()).ok_or_else(|| color_eyre::eyre::eyre!("No quotes configured"))?;
 	println!("Selected quote: {:?}", quote.text);
 	println!("Author: {:?}", quote.author);
+	println!("Generating CSS...");
 
 	// Get display resolution from swaymsg
 	let (display_width, display_height) = get_display_resolution()?;
 
 	// Save resized background image to temp location
 	let temp_bg_path = v_utils::xdg_state_file!("background_temp.png");
-	let img = image::open(&args.input)?;
+	let img = image::open(&input_path)?;
 	let resized_img = resize_fill(img, display_width, display_height);
 	resized_img.save(&temp_bg_path)?;
 
@@ -62,6 +98,10 @@ fn main() -> Result<()> {
 	Command::new("swaymsg").args(["output", "*", "background", output_path.to_str().unwrap(), "fill"]).output()?;
 
 	println!("Wallpaper set to {}", output_path.display());
+
+	// Save the input path to cache for next time
+	save_last_input(&input_path)?;
+
 	Ok(())
 }
 
@@ -107,10 +147,15 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, width
 
 	// Convert text lines for tspan elements
 	let lines: Vec<&str> = escaped_text.lines().collect();
+
+	// Find the longest line for alignment
+	let longest_line = lines.iter().max_by_key(|l| l.len()).unwrap_or(&"");
+	let quote_x = width / 2 + 40;
+
 	let tspan_elements: String = lines
 		.iter()
 		.enumerate()
-		.map(|(i, line)| format!(r#"<tspan x="{}" dy="{}">{}</tspan>"#, width / 2 + 40, if i == 0 { "0" } else { "1.3em" }, line))
+		.map(|(i, line)| format!(r#"<tspan x="{}" dy="{}">{}</tspan>"#, quote_x, if i == 0 { "0" } else { "1.3em" }, line))
 		.collect::<Vec<_>>()
 		.join("\n      ");
 
@@ -129,7 +174,12 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, width
 			.replace('>', "&gt;")
 			.replace('"', "&quot;")
 			.replace('\'', "&apos;");
-		format!(r#"<text class="author" x="{}" y="{}">{} {}</text>"#, width / 2 + 40, author_y, "©", escaped_author)
+		// Align author to the end of the longest quote line
+		// Approximate character width in monospace font at 28px: ~17px per char
+		let char_width_quote = 17.0;
+		let longest_line_width = longest_line.len() as f32 * char_width_quote;
+		let author_x = quote_x as f32 + longest_line_width;
+		format!(r#"<text class="author" x="{}" y="{}">{} {}</text>"#, author_x as u32, author_y, "©", escaped_author)
 	} else {
 		String::new()
 	};
@@ -139,21 +189,17 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, width
 <svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <defs>
     <style>
-      @font-face {{
-        font-family: 'DejaVu Sans Mono';
-        src: url('file://{}') format('truetype');
-      }}
       .quote {{
-        font-family: 'DejaVu Sans Mono', monospace;
+        font-family: 'DejaVu Sans Mono';
         font-size: 28px;
         fill: white;
         text-anchor: start;
       }}
       .author {{
-        font-family: 'DejaVu Sans Mono', monospace;
+        font-family: 'DejaVu Sans Mono';
         font-size: 21px;
         fill: white;
-        text-anchor: start;
+        text-anchor: end;
       }}
     </style>
   </defs>
@@ -163,7 +209,6 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, width
   </text>
   {author_element}
 </svg>"#,
-		std::env::current_dir()?.join("assets/DejaVuSansMono.ttf").display(),
 		bg_image_path.display(),
 		width / 2 + 40,
 		quote_y,
