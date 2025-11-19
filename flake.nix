@@ -85,6 +85,9 @@
 
                 cp -f ${readme} ./README.md
 
+                mkdir -p ./assets
+                cp -f ${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSansMono.ttf ./assets/DejaVuSansMono.ttf
+
                 alias qr="./target/debug/${pname}"
               '';
 
@@ -93,10 +96,11 @@
               openssl
               pkg-config
               rust
+              dejavu_fonts
             ] ++ pre-commit-check.enabledPackages;
 
-						env.RUST_BACKTRACE = 1;
-						env.RUST_LIB_BACKTRACE = 0;
+            env.RUST_BACKTRACE = 1;
+            env.RUST_LIB_BACKTRACE = 0;
           };
       }
     );
