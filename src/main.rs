@@ -2,6 +2,7 @@ use std::{path::PathBuf, process::Command};
 
 use clap::Parser;
 use color_eyre::Result;
+use image::GenericImageView;
 use rand::seq::SliceRandom;
 use serde::Deserialize;
 use v_utils::utils::eyre::exit_on_error;
@@ -18,10 +19,19 @@ struct Args {
 #[derive(Debug, Deserialize)]
 struct SwayOutput {
 	current_mode: CurrentMode,
+	active: bool,
 }
 
 #[derive(Debug, Deserialize)]
 struct CurrentMode {
+	width: u32,
+	height: u32,
+}
+
+#[derive(Clone, Debug)]
+struct SafeArea {
+	x: u32,
+	y: u32,
 	width: u32,
 	height: u32,
 }
@@ -87,14 +97,43 @@ fn run() -> Result<()> {
 	// Get display resolution from swaymsg
 	let (display_width, display_height) = get_display_resolution()?;
 
+	// Get all active displays to calculate safe area
+	let all_displays = get_all_active_displays()?;
+	println!("Found {} active display(s)", all_displays.len());
+	for (i, (w, h)) in all_displays.iter().enumerate() {
+		println!("  Display {}: {}x{} (ratio: {:.3})", i + 1, w, h, *w as f32 / *h as f32);
+	}
+
 	// Save resized background image to temp location
 	let temp_bg_path = v_utils::xdg_state_file!("background_temp.png");
 	let img = image::open(&input_path)?;
 	let resized_img = resize_fill(img, display_width, display_height);
+	let (img_width, img_height) = resized_img.dimensions();
 	resized_img.save(&temp_bg_path)?;
 
+	// Calculate safe area that will be visible on all monitors
+	let safe_area = calculate_safe_area(img_width, img_height, &all_displays);
+	println!(
+		"Safe area: x={}, y={}, width={}, height={} ({:.1}% of image)",
+		safe_area.x,
+		safe_area.y,
+		safe_area.width,
+		safe_area.height,
+		(safe_area.width * safe_area.height) as f32 / (img_width * img_height) as f32 * 100.0
+	);
+
 	// Generate SVG with background image and text overlay
-	let svg_content = generate_svg(&temp_bg_path, &quote.text, quote.author.as_deref(), balance_text.as_deref(), display_width, display_height)?;
+	let text_padding = config.text_padding.unwrap_or(15);
+	let svg_content = generate_svg(
+		&temp_bg_path,
+		&quote.text,
+		quote.author.as_deref(),
+		balance_text.as_deref(),
+		img_width,
+		img_height,
+		&safe_area,
+		text_padding,
+	)?;
 
 	// Debug: save SVG for inspection
 	let svg_debug_path = v_utils::xdg_state_file!("debug.svg");
@@ -103,7 +142,7 @@ fn run() -> Result<()> {
 
 	// Render SVG to PNG
 	let output_path = v_utils::xdg_state_file!("extended.png");
-	render_svg_to_png(&svg_content, &output_path, display_width, display_height)?;
+	render_svg_to_png(&svg_content, &output_path, img_width, img_height)?;
 
 	// Set wallpaper using swaymsg
 	Command::new("swaymsg").args(["output", "*", "background", output_path.to_str().unwrap(), "fill"]).output()?;
@@ -119,8 +158,65 @@ fn run() -> Result<()> {
 fn get_display_resolution() -> Result<(u32, u32)> {
 	let output = Command::new("swaymsg").args(["-t", "get_outputs"]).output()?;
 	let outputs: Vec<SwayOutput> = serde_json::from_slice(&output.stdout)?;
-	let output = outputs.first().ok_or_else(|| color_eyre::eyre::eyre!("No outputs found"))?;
+	let output = outputs.iter().find(|o| o.active).ok_or_else(|| color_eyre::eyre::eyre!("No active outputs found"))?;
 	Ok((output.current_mode.width, output.current_mode.height))
+}
+
+fn get_all_active_displays() -> Result<Vec<(u32, u32)>> {
+	let output = Command::new("swaymsg").args(["-t", "get_outputs"]).output()?;
+	let outputs: Vec<SwayOutput> = serde_json::from_slice(&output.stdout)?;
+	Ok(outputs.iter().filter(|o| o.active).map(|o| (o.current_mode.width, o.current_mode.height)).collect())
+}
+
+fn calculate_safe_area(img_width: u32, img_height: u32, displays: &[(u32, u32)]) -> SafeArea {
+	// For each display, calculate how the image would be cropped when using "fill" mode
+	// "fill" scales the image to cover the entire screen, then crops the excess
+
+	let img_ratio = img_width as f32 / img_height as f32;
+
+	let mut min_x = 0;
+	let mut min_y = 0;
+	let mut max_x = img_width;
+	let mut max_y = img_height;
+
+	for &(display_width, display_height) in displays {
+		let display_ratio = display_width as f32 / display_height as f32;
+
+		// Calculate how the image would be scaled and cropped for this display
+		let (scaled_width, _scaled_height, x_offset, y_offset) = if img_ratio > display_ratio {
+			// Image is wider than display - will crop horizontally
+			let scaled_height = display_height;
+			let scaled_width = (display_height as f32 * img_ratio) as u32;
+			let x_offset = (scaled_width - display_width) / 2;
+			(scaled_width, scaled_height, x_offset, 0)
+		} else {
+			// Image is taller than display - will crop vertically
+			let scaled_width = display_width;
+			let scaled_height = (display_width as f32 / img_ratio) as u32;
+			let y_offset = (scaled_height - display_height) / 2;
+			(scaled_width, scaled_height, 0, y_offset)
+		};
+
+		// Convert the cropped area back to original image coordinates
+		let scale_factor = img_width as f32 / scaled_width as f32;
+		let crop_x_start = (x_offset as f32 * scale_factor) as u32;
+		let crop_y_start = (y_offset as f32 * scale_factor) as u32;
+		let crop_x_end = crop_x_start + (display_width as f32 * scale_factor) as u32;
+		let crop_y_end = crop_y_start + (display_height as f32 * scale_factor) as u32;
+
+		// Update the safe area to be the intersection of all cropped areas
+		min_x = min_x.max(crop_x_start);
+		min_y = min_y.max(crop_y_start);
+		max_x = max_x.min(crop_x_end);
+		max_y = max_y.min(crop_y_end);
+	}
+
+	SafeArea {
+		x: min_x,
+		y: min_y,
+		width: max_x.saturating_sub(min_x),
+		height: max_y.saturating_sub(min_y),
+	}
 }
 
 fn resize_fill(img: image::DynamicImage, target_width: u32, target_height: u32) -> image::DynamicImage {
@@ -147,7 +243,7 @@ fn resize_fill(img: image::DynamicImage, target_width: u32, target_height: u32) 
 	DynamicImage::ImageRgba8(imageops::crop_imm(&resized.to_rgba8(), x_offset, y_offset, target_width, target_height).to_image())
 }
 
-fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balance: Option<&str>, width: u32, height: u32) -> Result<String> {
+fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balance: Option<&str>, width: u32, height: u32, safe_area: &SafeArea, text_padding: u32) -> Result<String> {
 	// Escape HTML entities in text
 	let escaped_text = text
 		.replace('&', "&amp;")
@@ -161,7 +257,9 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
 
 	// Find the longest line for alignment
 	let longest_line = lines.iter().max_by_key(|l| l.len()).unwrap_or(&"");
-	let quote_x = width / 2 + 40;
+
+	// Position quote within safe area (centered horizontally in safe area) with padding
+	let quote_x = safe_area.x + safe_area.width / 2 + text_padding;
 
 	let tspan_elements: String = lines
 		.iter()
@@ -170,8 +268,8 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
 		.collect::<Vec<_>>()
 		.join("\n      ");
 
-	// Calculate approximate y position for quote text (centered vertically)
-	let quote_y = height / 2;
+	// Calculate approximate y position for quote text (centered vertically in safe area)
+	let quote_y = safe_area.y + safe_area.height / 2;
 
 	// Calculate y position for author (below the quote, accounting for number of lines)
 	let line_height = 36; // 28px * 1.3 ≈ 36
@@ -205,8 +303,9 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
 
 		// Split balance into lines and create tspan elements
 		let balance_lines: Vec<&str> = escaped_balance.lines().collect();
-		let balance_x = 40;
-		let balance_y = 60;
+		// Position balance in top-left corner of safe area with padding
+		let balance_x = safe_area.x + text_padding;
+		let balance_y = safe_area.y + text_padding * 2;
 
 		let balance_tspans: String = balance_lines
 			.iter()

@@ -4,10 +4,21 @@ use color_eyre::eyre::{Result, WrapErr as _, bail};
 use serde::{Deserialize, Deserializer};
 use v_utils::{io::ExpandedPath, macros::MyConfigPrimitives};
 
-#[derive(Clone, Debug, Default, MyConfigPrimitives)]
+#[derive(Clone, Debug, MyConfigPrimitives)]
 pub struct AppConfig {
 	pub quotes: Vec<Quote>,
 	pub balance: Option<Balance>,
+	pub text_padding: Option<u32>,
+}
+
+impl Default for AppConfig {
+	fn default() -> Self {
+		Self {
+			quotes: Vec::new(),
+			balance: None,
+			text_padding: Some(15),
+		}
+	}
 }
 
 #[derive(Clone, Debug, Deserialize)]
