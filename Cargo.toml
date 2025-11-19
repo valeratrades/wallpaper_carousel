@@ -8,15 +8,20 @@ edition = "2024"
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
 [dependencies]
-ab_glyph = "^0.2"
 clap = { version = "^4", features = ["derive"] }
 color-eyre = "^0.6.3"
+config = "^0.14"
 derive-new = "^0"
+fontdb = "^0.22"
 image = "^0.25"
-imageproc = "^0.25"
+rand = "^0.8"
+resvg = "^0.44"
 serde = { version = "^1", features = ["derive"] }
 serde_json = "^1"
+tiny-skia = "^0.11"
+usvg = "^0.44"
 v_utils = "^2"
+xdg = "^3"
 
 [lints.clippy]
 # Stable

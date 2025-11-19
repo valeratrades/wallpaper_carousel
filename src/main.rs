@@ -1,11 +1,10 @@
 use std::{path::PathBuf, process::Command};
 
-use ab_glyph::{FontVec, PxScale};
 use clap::Parser;
 use color_eyre::Result;
-use image::{DynamicImage, GenericImageView, ImageFormat, Rgba, RgbaImage, imageops};
-use imageproc::drawing::draw_text_mut;
+use rand::seq::SliceRandom;
 use serde::Deserialize;
+use wallpaper_carousel::config::AppConfig;
 
 #[derive(Debug, Parser)]
 #[command(name = "wallpaper_carousel")]
@@ -30,30 +29,32 @@ fn main() -> Result<()> {
 	color_eyre::install()?;
 	let args = Args::parse();
 
+	// Load config
+	let config = AppConfig::read(None)?;
+
+	// Select a random quote
+	let quote = config.quotes.choose(&mut rand::thread_rng()).ok_or_else(|| color_eyre::eyre::eyre!("No quotes configured"))?;
+
 	// Get display resolution from swaymsg
 	let (display_width, display_height) = get_display_resolution()?;
 
-	// Load the input image
+	// Save resized background image to temp location
+	let temp_bg_path = v_utils::xdg_state_file!("background_temp.png");
 	let img = image::open(&args.input)?;
-
-	// Detect the image format from the input file
-	let format = ImageFormat::from_path(&args.input)?;
-	let extension = match format {
-		ImageFormat::Png => "png",
-		ImageFormat::Jpeg => "jpg",
-		_ => "png", // Default to png for other formats
-	};
-
-	// Resize image to fill display (like swaymsg does)
 	let resized_img = resize_fill(img, display_width, display_height);
-	let mut rgba_img = resized_img.to_rgba8();
+	resized_img.save(&temp_bg_path)?;
 
-	// Add citation text at the rightmost middle point
-	add_citation(&mut rgba_img, "hello world");
+	// Generate SVG with background image and text overlay
+	let svg_content = generate_svg(&temp_bg_path, quote, display_width, display_height)?;
 
-	// Save to XDG_STATE_HOME
-	let output_path = v_utils::xdg_state_file!(&format!("extended.{}", extension));
-	rgba_img.save(&output_path)?;
+	// Debug: save SVG for inspection
+	let svg_debug_path = v_utils::xdg_state_file!("debug.svg");
+	std::fs::write(&svg_debug_path, &svg_content)?;
+	println!("SVG saved to {}", svg_debug_path.display());
+
+	// Render SVG to PNG
+	let output_path = v_utils::xdg_state_file!("extended.png");
+	render_svg_to_png(&svg_content, &output_path, display_width, display_height)?;
 
 	// Set wallpaper using swaymsg
 	Command::new("swaymsg").args(["output", "*", "background", output_path.to_str().unwrap(), "fill"]).output()?;
@@ -64,61 +65,103 @@ fn main() -> Result<()> {
 
 fn get_display_resolution() -> Result<(u32, u32)> {
 	let output = Command::new("swaymsg").args(["-t", "get_outputs"]).output()?;
-
 	let outputs: Vec<SwayOutput> = serde_json::from_slice(&output.stdout)?;
-
-	// Get the first active output
 	let output = outputs.first().ok_or_else(|| color_eyre::eyre::eyre!("No outputs found"))?;
-
 	Ok((output.current_mode.width, output.current_mode.height))
 }
 
-fn resize_fill(img: DynamicImage, target_width: u32, target_height: u32) -> DynamicImage {
+fn resize_fill(img: image::DynamicImage, target_width: u32, target_height: u32) -> image::DynamicImage {
+	use image::{DynamicImage, GenericImageView, imageops};
+
 	let (img_width, img_height) = img.dimensions();
 	let img_ratio = img_width as f32 / img_height as f32;
 	let target_ratio = target_width as f32 / target_height as f32;
 
-	// Calculate dimensions to fill the target while maintaining aspect ratio
 	let (scaled_width, scaled_height) = if img_ratio > target_ratio {
-		// Image is wider than target, scale to height
 		let scaled_height = target_height;
 		let scaled_width = (target_height as f32 * img_ratio) as u32;
 		(scaled_width, scaled_height)
 	} else {
-		// Image is taller than target, scale to width
 		let scaled_width = target_width;
 		let scaled_height = (target_width as f32 / img_ratio) as u32;
 		(scaled_width, scaled_height)
 	};
 
-	// Resize the image
 	let resized = img.resize_exact(scaled_width, scaled_height, imageops::FilterType::Lanczos3);
-
-	// Crop to exact target dimensions (center crop)
 	let x_offset = (scaled_width.saturating_sub(target_width)) / 2;
 	let y_offset = (scaled_height.saturating_sub(target_height)) / 2;
 
 	DynamicImage::ImageRgba8(imageops::crop_imm(&resized.to_rgba8(), x_offset, y_offset, target_width, target_height).to_image())
 }
 
-fn add_citation(img: &mut RgbaImage, text: &str) {
-	let (width, height) = img.dimensions();
+fn generate_svg(bg_image_path: &PathBuf, text: &str, width: u32, height: u32) -> Result<String> {
+	// Escape HTML entities in text
+	let escaped_text = text
+		.replace('&', "&amp;")
+		.replace('<', "&lt;")
+		.replace('>', "&gt;")
+		.replace('"', "&quot;")
+		.replace('\'', "&apos;");
 
-	// Embed DejaVu Sans Mono font
-	let font_data = include_bytes!("../assets/DejaVuSansMono.ttf");
-	let font = FontVec::try_from_vec(font_data.to_vec()).expect("Error loading font");
+	// Convert text lines for tspan elements
+	let lines: Vec<&str> = escaped_text.lines().collect();
+	let tspan_elements: String = lines
+		.iter()
+		.enumerate()
+		.map(|(i, line)| format!(r#"<tspan x="{}" dy="{}">{}</tspan>"#, width / 2 + 40, if i == 0 { "0" } else { "1.3em" }, line))
+		.collect::<Vec<_>>()
+		.join("\n      ");
 
-	let scale = PxScale::from(32.0);
-	let color = Rgba([255u8, 255u8, 255u8, 255u8]); // White text
+	let svg = format!(
+		r#"<?xml version="1.0" encoding="UTF-8"?>
+<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <style>
+      @font-face {{
+        font-family: 'DejaVu Sans Mono';
+        src: url('file://{}') format('truetype');
+      }}
+      .quote {{
+        font-family: 'DejaVu Sans Mono', monospace;
+        font-size: 28px;
+        fill: white;
+        text-anchor: start;
+      }}
+    </style>
+  </defs>
+  <image href="file://{}" x="0" y="0" width="{width}" height="{height}" />
+  <text class="quote" x="{}" y="{}">
+      {tspan_elements}
+  </text>
+</svg>"#,
+		std::env::current_dir()?.join("assets/DejaVuSansMono.ttf").display(),
+		bg_image_path.display(),
+		width / 2 + 40,
+		height / 2,
+	);
 
-	// Calculate text position (rightmost middle)
-	// We'll position it with some padding from the right edge
-	let _padding = 20;
-	let y_position = (height / 2) as i32;
+	Ok(svg)
+}
 
-	// For right alignment, we need to measure the text width
-	// For now, we'll use a simple approach and place it near the right edge
-	let x_position = (width - 200) as i32; // Approximate positioning
+fn render_svg_to_png(svg_content: &str, output_path: &PathBuf, width: u32, height: u32) -> Result<()> {
+	// Set up font database for usvg
+	let mut fontdb = fontdb::Database::new();
+	fontdb.load_system_fonts();
 
-	draw_text_mut(img, color, x_position, y_position, scale, &font, text);
+	// Load our custom font
+	let font_path = std::env::current_dir()?.join("assets/DejaVuSansMono.ttf");
+	fontdb.load_font_file(&font_path)?;
+
+	let mut options = usvg::Options::default();
+	options.fontdb = std::sync::Arc::new(fontdb);
+
+	let tree = usvg::Tree::from_str(svg_content, &options)?;
+
+	let mut pixmap = tiny_skia::Pixmap::new(width, height).ok_or_else(|| color_eyre::eyre::eyre!("Failed to create pixmap"))?;
+
+	resvg::render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
+
+	pixmap.save_png(output_path)?;
+
+	Ok(())
 }
