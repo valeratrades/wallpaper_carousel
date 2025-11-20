@@ -126,10 +126,12 @@ fn run() -> Result<()> {
 		(safe_area.width * safe_area.height) as f32 / (img_width * img_height) as f32 * 100.0
 	);
 
-	// Generate SVG with background image and text overlay
+	// Composite text onto background image
 	let text_padding = config.text_padding.unwrap_or(15);
-	let svg_content = generate_svg(
+	let output_path = v_utils::xdg_state_file!("extended.png");
+	composite_text_on_image(
 		&temp_bg_path,
+		&output_path,
 		&quote.text,
 		quote.author.as_deref(),
 		balance_text.as_deref(),
@@ -138,15 +140,6 @@ fn run() -> Result<()> {
 		&safe_area,
 		text_padding,
 	)?;
-
-	// Debug: save SVG for inspection
-	let svg_debug_path = v_utils::xdg_state_file!("debug.svg");
-	std::fs::write(&svg_debug_path, &svg_content)?;
-	println!("SVG saved to {}", svg_debug_path.display());
-
-	// Render SVG to PNG
-	let output_path = v_utils::xdg_state_file!("extended.png");
-	render_svg_to_png(&svg_content, &output_path, img_width, img_height)?;
 
 	// Set wallpaper using swaymsg
 	Command::new("swaymsg").args(["output", "*", "background", output_path.to_str().unwrap(), "fill"]).output()?;
@@ -247,7 +240,7 @@ fn resize_fill(img: image::DynamicImage, target_width: u32, target_height: u32) 
 	DynamicImage::ImageRgba8(imageops::crop_imm(&resized.to_rgba8(), x_offset, y_offset, target_width, target_height).to_image())
 }
 
-fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balance: Option<&str>, width: u32, height: u32, safe_area: &SafeArea, text_padding: u32) -> Result<String> {
+fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, width: u32, height: u32, safe_area: &SafeArea, text_padding: u32) -> Result<String> {
 	// Nested padding levels: [level0, level1, level2, level3, level4]
 	// Each level is half of the previous
 	let padding_levels: [u32; 5] = [text_padding, text_padding / 2, text_padding / 4, text_padding / 8, text_padding / 16];
@@ -363,7 +356,7 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
 
 	let svg = format!(
 		r#"<?xml version="1.0" encoding="UTF-8"?>
-<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <style>
       .quote {{
@@ -386,29 +379,40 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
       }}
     </style>
   </defs>
-  <image href="file://{}" x="0" y="0" width="{width}" height="{height}" />
   <text class="quote" x="{}" y="{}">
       {}
   </text>
   {author_element}
   {balance_element}
 </svg>"#,
-		bg_image_path.display(),
-		quote_x,
-		quote_y,
-		quote_tspans,
+		quote_x, quote_y, quote_tspans,
 	);
 
 	Ok(svg)
 }
 
-fn render_svg_to_png(svg_content: &str, output_path: &PathBuf, width: u32, height: u32) -> Result<()> {
+fn composite_text_on_image(
+	bg_image_path: &PathBuf,
+	output_path: &PathBuf,
+	text: &str,
+	author: Option<&str>,
+	balance: Option<&str>,
+	width: u32,
+	height: u32,
+	safe_area: &SafeArea,
+	text_padding: u32,
+) -> Result<()> {
+	// Load background image
+	let mut bg_image = image::open(bg_image_path)?.to_rgba8();
+
+	// Generate SVG with just the text elements (no background)
+	let svg_content = generate_text_svg(text, author, balance, width, height, safe_area, text_padding)?;
+
 	// Set up font database for usvg
 	let mut fontdb = fontdb::Database::new();
 	fontdb.load_system_fonts();
 
 	// Try to load DejaVu Sans Mono from common locations (for dev environment)
-	// In production, it should be available via system fonts
 	let dev_font_path = std::env::current_dir().ok().map(|p| p.join("assets/DejaVuSansMono.ttf"));
 	if let Some(path) = dev_font_path {
 		if path.exists() {
@@ -419,13 +423,33 @@ fn render_svg_to_png(svg_content: &str, output_path: &PathBuf, width: u32, heigh
 	let mut options = usvg::Options::default();
 	options.fontdb = std::sync::Arc::new(fontdb);
 
-	let tree = usvg::Tree::from_str(svg_content, &options)?;
+	let tree = usvg::Tree::from_str(&svg_content, &options)?;
 
-	let mut pixmap = tiny_skia::Pixmap::new(width, height).ok_or_else(|| color_eyre::eyre::eyre!("Failed to create pixmap"))?;
+	// Render text SVG to a transparent pixmap
+	let mut text_pixmap = tiny_skia::Pixmap::new(width, height).ok_or_else(|| color_eyre::eyre::eyre!("Failed to create pixmap"))?;
 
-	resvg::render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
+	resvg::render(&tree, tiny_skia::Transform::default(), &mut text_pixmap.as_mut());
 
-	pixmap.save_png(output_path)?;
+	// Composite text layer onto background image
+	for y in 0..height {
+		for x in 0..width {
+			let text_pixel = text_pixmap.pixel(x, y).ok_or_else(|| color_eyre::eyre::eyre!("Failed to get pixel"))?;
+			let alpha = text_pixel.alpha();
+
+			if alpha > 0 {
+				let bg_pixel = bg_image.get_pixel_mut(x, y);
+				let alpha_f = alpha as f32 / 255.0;
+
+				// Alpha blending
+				bg_pixel[0] = ((text_pixel.red() as f32 * alpha_f) + (bg_pixel[0] as f32 * (1.0 - alpha_f))) as u8;
+				bg_pixel[1] = ((text_pixel.green() as f32 * alpha_f) + (bg_pixel[1] as f32 * (1.0 - alpha_f))) as u8;
+				bg_pixel[2] = ((text_pixel.blue() as f32 * alpha_f) + (bg_pixel[2] as f32 * (1.0 - alpha_f))) as u8;
+			}
+		}
+	}
+
+	// Save the composited image
+	bg_image.save(output_path)?;
 
 	Ok(())
 }
