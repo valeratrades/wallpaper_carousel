@@ -248,6 +248,9 @@ fn resize_fill(img: image::DynamicImage, target_width: u32, target_height: u32) 
 }
 
 fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balance: Option<&str>, width: u32, height: u32, safe_area: &SafeArea, text_padding: u32) -> Result<String> {
+	// Nested padding levels: [level0, level1, level2, level3, level4]
+	// Each level is half of the previous
+	let padding_levels: [u32; 5] = [text_padding, text_padding / 2, text_padding / 4, text_padding / 8, text_padding / 16];
 	// Escape HTML entities in text
 	let escaped_text = text
 		.replace('&', "&amp;")
@@ -256,14 +259,18 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
 		.replace('"', "&quot;")
 		.replace('\'', "&apos;");
 
-	// Position quote in top-right corner of safe area with padding
-	// Estimate text width and position so text doesn't go off screen
-	let estimated_text_width = 500; // Rough estimate for longest line
-	let quote_x = safe_area.x + safe_area.width - text_padding - estimated_text_width;
-	let quote_y = safe_area.y + text_padding * 2;
-
-	// Split into lines and create tspan elements
+	// Calculate text widths (approximate for monospace: char_count * char_width)
+	let quote_font_size = 28;
+	let char_width_quote = (quote_font_size as f32 * 0.6) as u32; // Monospace chars are ~0.6 of font size
 	let quote_lines: Vec<&str> = escaped_text.lines().collect();
+	let max_quote_line_len = quote_lines.iter().map(|l| l.len()).max().unwrap_or(0);
+	let quote_text_width = max_quote_line_len as u32 * char_width_quote;
+
+	// Position quote in top-right corner of safe area with level 0 padding
+	let quote_x = safe_area.x + safe_area.width - padding_levels[0] - quote_text_width;
+	let quote_y = safe_area.y + padding_levels[0] * 2;
+
+	// Create tspan elements
 	let quote_tspans: String = quote_lines
 		.iter()
 		.enumerate()
@@ -281,8 +288,8 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
 	let line_height = 34; // 28px * 1.2 ≈ 34
 	let quote_height = quote_lines.len() as u32 * line_height;
 
-	// Calculate y position for author (below the quote with text_padding gap)
-	let author_y = quote_y + quote_height + text_padding;
+	// Author is nested inside quote component (level 1 padding)
+	let author_y = quote_y + quote_height + padding_levels[1];
 
 	let (author_element, author_height) = if let Some(author) = author {
 		let escaped_author = author
@@ -291,22 +298,24 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
 			.replace('>', "&gt;")
 			.replace('"', "&quot;")
 			.replace('\'', "&apos;");
-		// Author aligned to the right, same as quote
-		let author_height = 21; // font size (no extra gap needed, text_padding handles it)
-		(
-			format!(r#"<text class="author" x="{}" y="{}">{} {}</text>"#, quote_x, author_y, "©", escaped_author),
-			author_height,
-		)
+
+		// Calculate author text width
+		let author_text = format!("© {}", escaped_author);
+
+		// Position author at the end of the longest quote line (right-aligned)
+		let author_x = quote_x + quote_text_width;
+		let author_height = 21;
+		(format!(r#"<text class="author" x="{}" y="{}">{}</text>"#, author_x, author_y, author_text), author_height)
 	} else {
 		(String::new(), 0)
 	};
 
 	// Calculate the bottom of the quote component (for positioning balance below)
-	// Add text_padding after the last element of quote component
+	// Use level 0 padding after the entire quote component
 	let quote_bottom_y = if author.is_some() {
-		author_y + author_height + text_padding
+		author_y + author_height + padding_levels[0]
 	} else {
-		quote_y + quote_height + text_padding
+		quote_y + quote_height + padding_levels[0]
 	};
 
 	let balance_element = if let Some(balance) = balance {
@@ -317,13 +326,18 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
 			.replace('"', "&quot;")
 			.replace('\'', "&apos;");
 
-		// Position balance right below the quote component
-		let estimated_balance_width = 400;
-		let balance_x = safe_area.x + safe_area.width - text_padding - estimated_balance_width;
+		// Calculate balance text width
+		let balance_font_size = 20;
+		let char_width_balance = (balance_font_size as f32 * 0.6) as u32;
+		let balance_lines: Vec<&str> = escaped_balance.lines().collect();
+		let max_balance_line_len = balance_lines.iter().map(|l| l.len()).max().unwrap_or(0);
+		let balance_text_width = max_balance_line_len as u32 * char_width_balance;
+
+		// Position balance right below the quote component (level 0 padding from right edge)
+		let balance_x = safe_area.x + safe_area.width - padding_levels[0] - balance_text_width;
 		let balance_y = quote_bottom_y;
 
-		// Split into lines and create tspan elements
-		let balance_lines: Vec<&str> = escaped_balance.lines().collect();
+		// Create tspan elements
 		let balance_tspans: String = balance_lines
 			.iter()
 			.enumerate()
