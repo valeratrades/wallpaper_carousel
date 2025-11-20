@@ -7,116 +7,165 @@
     v-utils.url = "github:valeratrades/.github";
   };
   outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, v-utils }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-          allowUnfree = true;
-        };
-        #NB: can't load rust-bin from nightly.latest, as there are week guarantees of which components will be available on each day.
-        rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
-          extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
-        });
-        pre-commit-check = pre-commit-hooks.lib.${system}.run (v-utils.files.preCommit { inherit pkgs; });
-        manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
-        pname = manifest.name;
-        stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
+    flake-utils.lib.eachDefaultSystem
+      (
+        system:
+        let
+          overlays = [ (import rust-overlay) ];
+          pkgs = import nixpkgs {
+            inherit system overlays;
+            allowUnfree = true;
+          };
+          #NB: can't load rust-bin from nightly.latest, as there are week guarantees of which components will be available on each day.
+          rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
+            extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
+          });
+          pre-commit-check = pre-commit-hooks.lib.${system}.run (v-utils.files.preCommit { inherit pkgs; });
+          manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
+          pname = manifest.name;
+          stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
 
-        workflowContents = v-utils.ci {
-          inherit pkgs;
-          lastSupportedVersion = "nightly-2025-11-18";
-          jobsErrors = [ "rust-tests" ];
-          jobsWarnings = [ "rust-doc" "rust-clippy" "rust-machete" "rust-sorted" "rust-sorted-derives" "tokei" ];
-          jobsOther = [ "loc-badge" ];
-        };
-        readme = v-utils.readme-fw {
-          inherit pkgs pname;
-          lastSupportedVersion = "nightly-1.93";
-          rootDir = ./.;
-          licenses = [{ name = "Blue Oak 1.0.0"; outPath = "LICENSE"; }];
-          badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ];
-        };
-      in
-      {
-        packages =
-          let
-            rustc = rust;
-            cargo = rust;
-            rustPlatform = pkgs.makeRustPlatform {
-              inherit rustc cargo stdenv;
+          workflowContents = v-utils.ci {
+            inherit pkgs;
+            lastSupportedVersion = "nightly-2025-11-18";
+            jobsErrors = [ "rust-tests" ];
+            jobsWarnings = [ "rust-doc" "rust-clippy" "rust-machete" "rust-sorted" "rust-sorted-derives" "tokei" ];
+            jobsOther = [ "loc-badge" ];
+          };
+          readme = v-utils.readme-fw {
+            inherit pkgs pname;
+            lastSupportedVersion = "nightly-1.93";
+            rootDir = ./.;
+            licenses = [{ name = "Blue Oak 1.0.0"; outPath = "LICENSE"; }];
+            badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ];
+          };
+        in
+        {
+          packages =
+            let
+              rustc = rust;
+              cargo = rust;
+              rustPlatform = pkgs.makeRustPlatform {
+                inherit rustc cargo stdenv;
+              };
+            in
+            {
+              default = rustPlatform.buildRustPackage rec {
+                inherit pname;
+                version = manifest.version;
+
+                buildInputs = with pkgs; [
+                  openssl.dev
+                  dejavu_fonts
+                ];
+                nativeBuildInputs = with pkgs; [ pkg-config ];
+
+                cargoLock.lockFile = ./Cargo.lock;
+                src = pkgs.lib.cleanSource ./.;
+
+                # Make DejaVu fonts available at runtime
+                postInstall = ''
+                  mkdir -p $out/share/fonts
+                  ln -s ${pkgs.dejavu_fonts}/share/fonts/truetype $out/share/fonts/truetype
+                '';
+
+                # Set FONTCONFIG_PATH to include our fonts
+                makeWrapperArgs = [
+                  "--prefix"
+                  "FONTCONFIG_PATH"
+                  ":"
+                  "$out/share/fonts"
+                ];
+              };
             };
-          in
-          {
-            default = rustPlatform.buildRustPackage rec {
-              inherit pname;
-              version = manifest.version;
 
-              buildInputs = with pkgs; [
-                openssl.dev
+          devShells.default =
+            with pkgs;
+            mkShell {
+              inherit stdenv;
+              shellHook =
+                pre-commit-check.shellHook
+                + workflowContents.shellHook
+                + ''
+                  cp -f ${v-utils.files.licenses.blue_oak} ./LICENSE
+
+                  cargo -Zscript -q ${v-utils.hooks.appendCustom} ./.git/hooks/pre-commit
+                  cp -f ${(v-utils.hooks.preCommit) { inherit pkgs pname; }} ./.git/hooks/custom.sh
+                  cp -f ${(v-utils.hooks.treefmt) { inherit pkgs; }} ./.treefmt.toml
+
+                  mkdir -p ./.cargo
+                  cp -f ${ (v-utils.files.gitignore { inherit pkgs; langs = [ "rs" ]; }) } ./.gitignore
+                  cp -f ${(v-utils.files.rust.clippy { inherit pkgs; })} ./.cargo/.clippy.toml
+                  cp -f ${(v-utils.files.rust.config { inherit pkgs; })} ./.cargo/config.toml
+                  cp -f ${(v-utils.files.rust.rustfmt { inherit pkgs; })} ./.rustfmt.toml
+
+                  cp -f ${readme} ./README.md
+
+                  mkdir -p ./assets
+                  cp -f ${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSansMono.ttf ./assets/DejaVuSansMono.ttf
+
+                  alias qr="./target/debug/${pname}"
+                '';
+
+              packages = [
+                mold-wrapped
+                openssl
+                pkg-config
+                rust
                 dejavu_fonts
-              ];
-              nativeBuildInputs = with pkgs; [ pkg-config ];
+              ] ++ pre-commit-check.enabledPackages;
 
-              cargoLock.lockFile = ./Cargo.lock;
-              src = pkgs.lib.cleanSource ./.;
+              env.RUST_BACKTRACE = 1;
+              env.RUST_LIB_BACKTRACE = 0;
+            };
+        }
+      ) // {
+      homeManagerModules.wallpaper-carousel = { config, lib, pkgs, ... }:
+        let
+          inherit (lib) mkEnableOption mkOption mkIf;
+          inherit (lib.types) package;
+          cfg = config.wallpaper-carousel;
+        in
+        {
+          options.wallpaper-carousel = {
+            enable = mkEnableOption "wallpaper carousel hourly extend";
 
-              # Make DejaVu fonts available at runtime
-              postInstall = ''
-                mkdir -p $out/share/fonts
-                ln -s ${pkgs.dejavu_fonts}/share/fonts/truetype $out/share/fonts/truetype
-              '';
-
-              # Set FONTCONFIG_PATH to include our fonts
-              makeWrapperArgs = [
-                "--prefix"
-                "FONTCONFIG_PATH"
-                ":"
-                "$out/share/fonts"
-              ];
+            package = mkOption {
+              type = package;
+              description = "The wallpaper_carousel package to use.";
             };
           };
 
-        devShells.default =
-          with pkgs;
-          mkShell {
-            inherit stdenv;
-            shellHook =
-              pre-commit-check.shellHook
-              + workflowContents.shellHook
-              + ''
-                cp -f ${v-utils.files.licenses.blue_oak} ./LICENSE
+          config = mkIf cfg.enable {
+            systemd.user.timers.wallpaper-extend = {
+              Unit = {
+                Description = "Timer to run wallpaper extend every hour";
+              };
 
-                cargo -Zscript -q ${v-utils.hooks.appendCustom} ./.git/hooks/pre-commit
-                cp -f ${(v-utils.hooks.preCommit) { inherit pkgs pname; }} ./.git/hooks/custom.sh
-                cp -f ${(v-utils.hooks.treefmt) { inherit pkgs; }} ./.treefmt.toml
+              Timer = {
+                OnBootSec = "1h";
+                OnUnitActiveSec = "1h";
+                Persistent = true;
+              };
 
-                mkdir -p ./.cargo
-                cp -f ${ (v-utils.files.gitignore { inherit pkgs; langs = [ "rs" ]; }) } ./.gitignore
-                cp -f ${(v-utils.files.rust.clippy { inherit pkgs; })} ./.cargo/.clippy.toml
-                cp -f ${(v-utils.files.rust.config { inherit pkgs; })} ./.cargo/config.toml
-                cp -f ${(v-utils.files.rust.rustfmt { inherit pkgs; })} ./.rustfmt.toml
+              Install = {
+                WantedBy = [ "timers.target" ];
+              };
+            };
 
-                cp -f ${readme} ./README.md
+            systemd.user.services.wallpaper-extend = {
+              Unit = {
+                Description = "Extend wallpaper with text overlays";
+              };
 
-                mkdir -p ./assets
-                cp -f ${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSansMono.ttf ./assets/DejaVuSansMono.ttf
-
-                alias qr="./target/debug/${pname}"
-              '';
-
-            packages = [
-              mold-wrapped
-              openssl
-              pkg-config
-              rust
-              dejavu_fonts
-            ] ++ pre-commit-check.enabledPackages;
-
-            env.RUST_BACKTRACE = 1;
-            env.RUST_LIB_BACKTRACE = 0;
+              Service = {
+                Type = "oneshot";
+                ExecStart = ''
+                  /bin/sh -c 'if ! ${cfg.package}/bin/wallpaper_carousel extend 2>&1 | grep -q "No input file provided"; then exit 0; else echo "Warning: No cached input file, skipping wallpaper extend"; exit 0; fi'
+                '';
+              };
+            };
           };
-      }
-    );
+        };
+    };
 }
