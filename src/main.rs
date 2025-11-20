@@ -260,7 +260,9 @@ fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, wi
 	let quote_text_width = max_quote_line_len as u32 * char_width_quote;
 
 	// Position quote in top-right corner of safe area with level 0 padding
-	let quote_x = safe_area.x + safe_area.width - padding_levels[0] - quote_text_width;
+	// We use right alignment, so quote_right_edge is the anchor point
+	let quote_right_edge = safe_area.x + safe_area.width - padding_levels[0];
+	let quote_x = quote_right_edge - quote_text_width;
 	let quote_y = safe_area.y + padding_levels[0] * 2;
 
 	// Create tspan elements
@@ -295,8 +297,8 @@ fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, wi
 		// Calculate author text width
 		let author_text = format!("© {}", escaped_author);
 
-		// Position author at the end of the longest quote line (right-aligned)
-		let author_x = quote_x + quote_text_width;
+		// Position author at the same right edge as the quote (right-aligned with text-anchor: end)
+		let author_x = quote_right_edge;
 		let author_height = 21;
 		(format!(r#"<text class="author" x="{}" y="{}">{}</text>"#, author_x, author_y, author_text), author_height)
 	} else {
