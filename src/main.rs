@@ -1,10 +1,11 @@
-use std::{path::PathBuf, process::Command};
+use std::{path::PathBuf, process::Command as ProcessCommand};
 
 use clap::Parser;
 use color_eyre::Result;
 use image::GenericImageView;
-use rand::seq::SliceRandom;
+use rand::prelude::IndexedRandom;
 use serde::Deserialize;
+use tracing::info;
 use v_utils::utils::eyre::exit_on_error;
 use wallpaper_carousel::config::AppConfig;
 
@@ -12,8 +13,28 @@ use wallpaper_carousel::config::AppConfig;
 #[command(name = "wallpaper_carousel")]
 #[command(about = "Extend wallpaper with citation overlays")]
 struct Args {
-	/// Path to input image file (jpg or png). If not provided, uses the last input file from cache.
-	input: Option<PathBuf>,
+	#[command(subcommand)]
+	command: Command,
+}
+
+#[derive(Debug, Parser)]
+enum Command {
+	/// Extend an image with text overlays and set as wallpaper
+	Extend {
+		/// Path to input image file (jpg or png). If not provided, uses the last input file from cache.
+		input: Option<PathBuf>,
+	},
+
+	/// Circle through images in the same directory
+	Circle {
+		/// Go forwards
+		#[arg(short, long, conflicts_with = "backwards")]
+		forward: bool,
+
+		/// Go backwards
+		#[arg(short, long, conflicts_with = "forward")]
+		backwards: bool,
+	},
 }
 
 #[derive(Debug, Deserialize)]
@@ -40,6 +61,103 @@ fn get_cache_file_path() -> PathBuf {
 	v_utils::xdg_cache_file!("last_input.txt")
 }
 
+fn get_lock_file_path() -> PathBuf {
+	v_utils::xdg_state_file!("wallpaper_generation.lock")
+}
+
+fn get_supported_image_extensions() -> Vec<&'static str> {
+	// Based on image crate's supported formats
+	vec!["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "tiff", "tif"]
+}
+
+fn find_next_image(current_path: &PathBuf, backwards: bool) -> Result<PathBuf> {
+	let parent = current_path.parent().ok_or_else(|| color_eyre::eyre::eyre!("Current image has no parent directory"))?;
+
+	// Get all image files in the directory
+	let mut image_files: Vec<PathBuf> = std::fs::read_dir(parent)?
+		.filter_map(|entry| entry.ok())
+		.map(|entry| entry.path())
+		.filter(|path| {
+			path.is_file()
+				&& path
+					.extension()
+					.and_then(|ext| ext.to_str())
+					.map(|ext| get_supported_image_extensions().contains(&ext.to_lowercase().as_str()))
+					.unwrap_or(false)
+		})
+		.collect();
+
+	if image_files.is_empty() {
+		return Err(color_eyre::eyre::eyre!("No images found in directory: {}", parent.display()));
+	}
+
+	// Sort files for consistent ordering
+	image_files.sort();
+
+	// Find current file index
+	let current_index = image_files
+		.iter()
+		.position(|p| p == current_path)
+		.ok_or_else(|| color_eyre::eyre::eyre!("Current file not found in directory listing"))?;
+
+	// Calculate next index
+	let next_index = if backwards {
+		if current_index == 0 { image_files.len() - 1 } else { current_index - 1 }
+	} else {
+		(current_index + 1) % image_files.len()
+	};
+
+	if image_files.len() == 1 {
+		return Err(color_eyre::eyre::eyre!("Only one image in directory: {}", parent.display()));
+	}
+
+	Ok(image_files[next_index].clone())
+}
+
+fn check_and_handle_lock() -> Result<()> {
+	let lock_path = get_lock_file_path();
+
+	if lock_path.exists() {
+		// Read PID from lock file
+		let pid_str = std::fs::read_to_string(&lock_path)?;
+		let pid: i32 = pid_str.trim().parse().map_err(|_| color_eyre::eyre::eyre!("Invalid PID in lock file"))?;
+
+		// Try to kill the process
+		v_utils::elog!("Found existing process (PID: {}), killing it...", pid);
+		unsafe {
+			libc::kill(pid, libc::SIGTERM);
+		}
+
+		// Wait a bit for the process to terminate
+		std::thread::sleep(std::time::Duration::from_millis(100));
+
+		// Remove the lock file
+		std::fs::remove_file(&lock_path)?;
+	}
+
+	Ok(())
+}
+
+fn create_lock() -> Result<()> {
+	let lock_path = get_lock_file_path();
+	if let Some(parent) = lock_path.parent() {
+		std::fs::create_dir_all(parent)?;
+	}
+
+	let pid = std::process::id();
+	std::fs::write(&lock_path, pid.to_string())?;
+
+	Ok(())
+}
+
+fn remove_lock() -> Result<()> {
+	let lock_path = get_lock_file_path();
+	if lock_path.exists() {
+		std::fs::remove_file(&lock_path)?;
+	}
+	Ok(())
+}
+
 fn save_last_input(path: &PathBuf) -> Result<()> {
 	let cache_path = get_cache_file_path();
 	if let Some(parent) = cache_path.parent() {
@@ -61,63 +179,57 @@ fn load_last_input() -> Result<PathBuf> {
 }
 
 fn main() {
+	v_utils::clientside!();
 	exit_on_error(run());
 }
 
-fn run() -> Result<()> {
-	color_eyre::install()?;
-	let args = Args::parse();
-
-	// Determine input path: use provided arg or load from cache
-	let input_path = match args.input {
-		Some(path) => path,
-		None => load_last_input()?,
-	};
+fn generate_wallpaper(input_path: &PathBuf) -> Result<()> {
+	info!("Starting wallpaper generation for: {}", input_path.display());
 
 	// Load config
 	let config = AppConfig::read(None)?;
 
 	// Select a random quote
-	let quote = config.quotes.choose(&mut rand::thread_rng()).ok_or_else(|| color_eyre::eyre::eyre!("No quotes configured"))?;
-	println!("Selected quote: {:?}", quote.text);
-	println!("Author: {:?}", quote.author);
+	let quote = config.quotes.choose(&mut rand::rng()).ok_or_else(|| color_eyre::eyre::eyre!("No quotes configured"))?;
+	v_utils::elog!("Selected quote: {:?}", quote.text);
+	v_utils::elog!("Author: {:?}", quote.author);
 
 	// Get balance value if configured
 	let balance_text = if let Some(balance) = &config.balance {
 		let value = balance.get_value()?;
 		if let Some(label) = &balance.label {
-			println!("{}:\n{}", label, value);
+			v_utils::elog!("{}:\n{}", label, value);
 			Some(format!("{}\n{}", label, value))
 		} else {
-			println!("{}", value);
+			v_utils::elog!("{}", value);
 			Some(value)
 		}
 	} else {
 		None
 	};
 
-	println!("Generating CSS...");
+	v_utils::log!("Generating CSS...");
 
 	// Get display resolution from swaymsg
 	let (display_width, display_height) = get_display_resolution()?;
 
 	// Get all active displays to calculate safe area
 	let all_displays = get_all_active_displays()?;
-	println!("Found {} active display(s)", all_displays.len());
+	v_utils::elog!("Found {} active display(s)", all_displays.len());
 	for (i, (w, h)) in all_displays.iter().enumerate() {
-		println!("  Display {}: {}x{} (ratio: {:.3})", i + 1, w, h, *w as f32 / *h as f32);
+		v_utils::elog!("  Display {}: {}x{} (ratio: {:.3})", i + 1, w, h, *w as f32 / *h as f32);
 	}
 
 	// Save resized background image to temp location
 	let temp_bg_path = v_utils::xdg_state_file!("background_temp.png");
-	let img = image::open(&input_path)?;
+	let img = image::open(input_path)?;
 	let resized_img = resize_fill(img, display_width, display_height);
 	let (img_width, img_height) = resized_img.dimensions();
 	resized_img.save(&temp_bg_path)?;
 
 	// Calculate safe area that will be visible on all monitors
 	let safe_area = calculate_safe_area(img_width, img_height, &all_displays);
-	println!(
+	v_utils::elog!(
 		"Safe area: x={}, y={}, width={}, height={} ({:.1}% of image)",
 		safe_area.x,
 		safe_area.y,
@@ -142,25 +254,105 @@ fn run() -> Result<()> {
 	)?;
 
 	// Set wallpaper using swaymsg
-	Command::new("swaymsg").args(["output", "*", "background", output_path.to_str().unwrap(), "fill"]).output()?;
+	ProcessCommand::new("swaymsg")
+		.args(["output", "*", "background", output_path.to_str().unwrap(), "fill"])
+		.output()?;
 
-	println!("Wallpaper set to {}", output_path.display());
-
-	// Save the input path to cache for next time
-	save_last_input(&input_path)?;
+	v_utils::log!("Wallpaper set to {}", output_path.display());
 
 	Ok(())
 }
 
+fn handle_next_command(backwards: bool) -> Result<()> {
+	info!("Circle command: backwards={}", backwards);
+
+	// Load the current image path
+	let current_path = load_last_input()?;
+
+	// Print the parent directory
+	let parent = current_path.parent().ok_or_else(|| color_eyre::eyre::eyre!("Current image has no parent directory"))?;
+	v_utils::log!("Directory: {}", parent.display());
+
+	// Find next image
+	let next_path = find_next_image(&current_path, backwards)?;
+	v_utils::log!("Next image: {}", next_path.display());
+
+	// Check for existing lock and kill if necessary
+	check_and_handle_lock()?;
+
+	// Set wallpaper immediately with the original next image (sway handles resizing)
+	ProcessCommand::new("swaymsg").args(["output", "*", "background", next_path.to_str().unwrap(), "fill"]).output()?;
+	v_utils::log!("Wallpaper set to: {}", next_path.display());
+
+	// Save the next path to cache
+	save_last_input(&next_path)?;
+
+	// Spawn a separate background process to generate text overlay
+	// We use std::process::Command instead of thread::spawn because when the main
+	// process exits, spawned threads are killed. A separate process continues independently.
+	let current_exe = std::env::current_exe()?;
+	ProcessCommand::new(current_exe)
+		.arg("extend")
+		.arg(&next_path)
+		.stdin(std::process::Stdio::null())
+		.stdout(std::process::Stdio::null())
+		.stderr(std::process::Stdio::null())
+		.spawn()?;
+
+	v_utils::log!("Text overlay generation started in background...");
+
+	Ok(())
+}
+
+fn run() -> Result<()> {
+	let args = Args::parse();
+
+	// Handle subcommands
+	match args.command {
+		Command::Circle { forward, backwards } => {
+			// Require at least one flag
+			if !forward && !backwards {
+				return Err(color_eyre::eyre::eyre!("Please specify either --forward or --backwards"));
+			}
+			// backwards takes precedence if both are somehow set
+			handle_next_command(backwards)
+		}
+		Command::Extend { input } => {
+			// Check and handle existing lock (kill previous background process if running)
+			check_and_handle_lock()?;
+
+			// Create lock for this process
+			create_lock()?;
+
+			// Determine input path: use provided arg or load from cache
+			let input_path = match input {
+				Some(path) => path,
+				None => load_last_input()?,
+			};
+
+			// Generate wallpaper
+			let result = generate_wallpaper(&input_path);
+
+			// Remove lock
+			remove_lock()?;
+
+			// Save the input path to cache for next time
+			save_last_input(&input_path)?;
+
+			result
+		}
+	}
+}
+
 fn get_display_resolution() -> Result<(u32, u32)> {
-	let output = Command::new("swaymsg").args(["-t", "get_outputs"]).output()?;
+	let output = ProcessCommand::new("swaymsg").args(["-t", "get_outputs"]).output()?;
 	let outputs: Vec<SwayOutput> = serde_json::from_slice(&output.stdout)?;
 	let output = outputs.iter().find(|o| o.active).ok_or_else(|| color_eyre::eyre::eyre!("No active outputs found"))?;
 	Ok((output.current_mode.width, output.current_mode.height))
 }
 
 fn get_all_active_displays() -> Result<Vec<(u32, u32)>> {
-	let output = Command::new("swaymsg").args(["-t", "get_outputs"]).output()?;
+	let output = ProcessCommand::new("swaymsg").args(["-t", "get_outputs"]).output()?;
 	let outputs: Vec<SwayOutput> = serde_json::from_slice(&output.stdout)?;
 	Ok(outputs.iter().filter(|o| o.active).map(|o| (o.current_mode.width, o.current_mode.height)).collect())
 }
@@ -416,10 +608,10 @@ fn composite_text_on_image(
 
 	// Try to load DejaVu Sans Mono from common locations (for dev environment)
 	let dev_font_path = std::env::current_dir().ok().map(|p| p.join("assets/DejaVuSansMono.ttf"));
-	if let Some(path) = dev_font_path {
-		if path.exists() {
-			let _ = fontdb.load_font_file(&path); // Ignore errors, system fonts are already loaded
-		}
+	if let Some(path) = dev_font_path
+		&& path.exists()
+	{
+		let _ = fontdb.load_font_file(&path); // Ignore errors, system fonts are already loaded
 	}
 
 	let mut options = usvg::Options::default();
