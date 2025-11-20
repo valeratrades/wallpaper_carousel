@@ -1,4 +1,7 @@
-use std::{path::PathBuf, process::Command as ProcessCommand};
+use std::{
+	path::{Path, PathBuf},
+	process::Command as ProcessCommand,
+};
 
 use clap::Parser;
 use color_eyre::Result;
@@ -57,6 +60,18 @@ struct SafeArea {
 	height: u32,
 }
 
+struct CompositeParams<'a> {
+	bg_image_path: &'a Path,
+	output_path: &'a Path,
+	text: &'a str,
+	author: Option<&'a str>,
+	balance: Option<&'a str>,
+	width: u32,
+	height: u32,
+	safe_area: &'a SafeArea,
+	text_padding: u32,
+}
+
 fn get_cache_file_path() -> PathBuf {
 	v_utils::xdg_cache_file!("last_input.txt")
 }
@@ -70,7 +85,7 @@ fn get_supported_image_extensions() -> Vec<&'static str> {
 	vec!["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "tiff", "tif"]
 }
 
-fn find_next_image(current_path: &PathBuf, backwards: bool) -> Result<PathBuf> {
+fn find_next_image(current_path: &Path, backwards: bool) -> Result<PathBuf> {
 	let parent = current_path.parent().ok_or_else(|| color_eyre::eyre::eyre!("Current image has no parent directory"))?;
 
 	// Get all image files in the directory
@@ -124,6 +139,8 @@ fn check_and_handle_lock() -> Result<()> {
 
 		// Try to kill the process
 		v_utils::elog!("Found existing process (PID: {}), killing it...", pid);
+		// SAFETY: We're sending SIGTERM to a process we know exists (read from lock file).
+		// The PID is validated to be a valid i32. SIGTERM is a safe signal to send.
 		unsafe {
 			libc::kill(pid, libc::SIGTERM);
 		}
@@ -158,7 +175,7 @@ fn remove_lock() -> Result<()> {
 	Ok(())
 }
 
-fn save_last_input(path: &PathBuf) -> Result<()> {
+fn save_last_input(path: &Path) -> Result<()> {
 	let cache_path = get_cache_file_path();
 	if let Some(parent) = cache_path.parent() {
 		std::fs::create_dir_all(parent)?;
@@ -183,7 +200,7 @@ fn main() {
 	exit_on_error(run());
 }
 
-fn generate_wallpaper(input_path: &PathBuf) -> Result<()> {
+fn generate_wallpaper(input_path: &Path) -> Result<()> {
 	info!("Starting wallpaper generation for: {}", input_path.display());
 
 	// Load config
@@ -241,17 +258,17 @@ fn generate_wallpaper(input_path: &PathBuf) -> Result<()> {
 	// Composite text onto background image
 	let text_padding = config.text_padding.unwrap_or(15);
 	let output_path = v_utils::xdg_state_file!("extended.png");
-	composite_text_on_image(
-		&temp_bg_path,
-		&output_path,
-		&quote.text,
-		quote.author.as_deref(),
-		balance_text.as_deref(),
-		img_width,
-		img_height,
-		&safe_area,
+	composite_text_on_image(&CompositeParams {
+		bg_image_path: &temp_bg_path,
+		output_path: &output_path,
+		text: &quote.text,
+		author: quote.author.as_deref(),
+		balance: balance_text.as_deref(),
+		width: img_width,
+		height: img_height,
+		safe_area: &safe_area,
 		text_padding,
-	)?;
+	})?;
 
 	// Set wallpaper using swaymsg
 	ProcessCommand::new("swaymsg")
@@ -585,22 +602,12 @@ fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, wi
 	Ok(svg)
 }
 
-fn composite_text_on_image(
-	bg_image_path: &PathBuf,
-	output_path: &PathBuf,
-	text: &str,
-	author: Option<&str>,
-	balance: Option<&str>,
-	width: u32,
-	height: u32,
-	safe_area: &SafeArea,
-	text_padding: u32,
-) -> Result<()> {
+fn composite_text_on_image(params: &CompositeParams) -> Result<()> {
 	// Load background image
-	let mut bg_image = image::open(bg_image_path)?.to_rgba8();
+	let mut bg_image = image::open(params.bg_image_path)?.to_rgba8();
 
 	// Generate SVG with just the text elements (no background)
-	let svg_content = generate_text_svg(text, author, balance, width, height, safe_area, text_padding)?;
+	let svg_content = generate_text_svg(params.text, params.author, params.balance, params.width, params.height, params.safe_area, params.text_padding)?;
 
 	// Set up font database for usvg
 	let mut fontdb = fontdb::Database::new();
@@ -614,19 +621,21 @@ fn composite_text_on_image(
 		let _ = fontdb.load_font_file(&path); // Ignore errors, system fonts are already loaded
 	}
 
-	let mut options = usvg::Options::default();
-	options.fontdb = std::sync::Arc::new(fontdb);
+	let options = usvg::Options {
+		fontdb: std::sync::Arc::new(fontdb),
+		..Default::default()
+	};
 
 	let tree = usvg::Tree::from_str(&svg_content, &options)?;
 
 	// Render text SVG to a transparent pixmap
-	let mut text_pixmap = tiny_skia::Pixmap::new(width, height).ok_or_else(|| color_eyre::eyre::eyre!("Failed to create pixmap"))?;
+	let mut text_pixmap = tiny_skia::Pixmap::new(params.width, params.height).ok_or_else(|| color_eyre::eyre::eyre!("Failed to create pixmap"))?;
 
 	resvg::render(&tree, tiny_skia::Transform::default(), &mut text_pixmap.as_mut());
 
 	// Composite text layer onto background image
-	for y in 0..height {
-		for x in 0..width {
+	for y in 0..params.height {
+		for x in 0..params.width {
 			let text_pixel = text_pixmap.pixel(x, y).ok_or_else(|| color_eyre::eyre::eyre!("Failed to get pixel"))?;
 			let alpha = text_pixel.alpha();
 
@@ -643,7 +652,7 @@ fn composite_text_on_image(
 	}
 
 	// Save the composited image
-	bg_image.save(output_path)?;
+	bg_image.save(params.output_path)?;
 
 	Ok(())
 }

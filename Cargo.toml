@@ -25,9 +25,6 @@ usvg = "^0.45"
 v_utils = { version = "^2.9.4", features = ["tracing"] }
 xdg = "^3"
 
-[patch.crates-io]
-v_utils = { path = "/home/v/s/v_utils/v_utils" }
-
 [lints.clippy]
 # Stable
 float_cmp = "allow" # is bad for `==` direct comparisons, but `<` and `>` should be allowed
