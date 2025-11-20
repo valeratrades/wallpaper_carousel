@@ -255,11 +255,10 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
 	// Convert text lines for tspan elements
 	let lines: Vec<&str> = escaped_text.lines().collect();
 
-	// Find the longest line for alignment
-	let longest_line = lines.iter().max_by_key(|l| l.len()).unwrap_or(&"");
-
-	// Position quote within safe area (centered horizontally in safe area) with padding
-	let quote_x = safe_area.x + safe_area.width / 2 + text_padding;
+	// Position quote in top-right corner of safe area with padding
+	// Using text-anchor: end for right alignment
+	let quote_x = safe_area.x + safe_area.width - text_padding;
+	let quote_y = safe_area.y + text_padding * 2;
 
 	let tspan_elements: String = lines
 		.iter()
@@ -268,29 +267,36 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
 		.collect::<Vec<_>>()
 		.join("\n      ");
 
-	// Calculate approximate y position for quote text (centered vertically in safe area)
-	let quote_y = safe_area.y + safe_area.height / 2;
-
-	// Calculate y position for author (below the quote, accounting for number of lines)
+	// Calculate height of quote block
 	let line_height = 36; // 28px * 1.3 ≈ 36
 	let quote_height = lines.len() as u32 * line_height;
-	let author_y = quote_y + quote_height + 20; // 20px gap below quote
 
-	let author_element = if let Some(author) = author {
+	// Calculate y position for author (below the quote with text_padding gap)
+	let author_y = quote_y + quote_height + text_padding;
+
+	let (author_element, author_height) = if let Some(author) = author {
 		let escaped_author = author
 			.replace('&', "&amp;")
 			.replace('<', "&lt;")
 			.replace('>', "&gt;")
 			.replace('"', "&quot;")
 			.replace('\'', "&apos;");
-		// Align author to the end of the longest quote line
-		// Approximate character width in monospace font at 28px: ~17px per char
-		let char_width_quote = 17.0;
-		let longest_line_width = longest_line.len() as f32 * char_width_quote;
-		let author_x = quote_x as f32 + longest_line_width;
-		format!(r#"<text class="author" x="{}" y="{}">{} {}</text>"#, author_x as u32, author_y, "©", escaped_author)
+		// Author aligned to the right, same as quote
+		let author_height = 21; // font size (no extra gap needed, text_padding handles it)
+		(
+			format!(r#"<text class="author" x="{}" y="{}">{} {}</text>"#, quote_x, author_y, "©", escaped_author),
+			author_height,
+		)
 	} else {
-		String::new()
+		(String::new(), 0)
+	};
+
+	// Calculate the bottom of the quote component (for positioning balance below)
+	// Add text_padding after the last element of quote component
+	let quote_bottom_y = if author.is_some() {
+		author_y + author_height + text_padding
+	} else {
+		quote_y + quote_height + text_padding
 	};
 
 	let balance_element = if let Some(balance) = balance {
@@ -303,9 +309,10 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
 
 		// Split balance into lines and create tspan elements
 		let balance_lines: Vec<&str> = escaped_balance.lines().collect();
-		// Position balance in top-left corner of safe area with padding
-		let balance_x = safe_area.x + text_padding;
-		let balance_y = safe_area.y + text_padding * 2;
+		// Position balance right below the quote component, aligned to the right
+		// quote_bottom_y already has text_padding added after the quote component
+		let balance_x = safe_area.x + safe_area.width - text_padding;
+		let balance_y = quote_bottom_y;
 
 		let balance_tspans: String = balance_lines
 			.iter()
@@ -333,7 +340,7 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
         font-family: 'DejaVu Sans Mono';
         font-size: 28px;
         fill: white;
-        text-anchor: start;
+        text-anchor: end;
       }}
       .author {{
         font-family: 'DejaVu Sans Mono';
@@ -345,20 +352,20 @@ fn generate_svg(bg_image_path: &PathBuf, text: &str, author: Option<&str>, balan
         font-family: 'DejaVu Sans Mono';
         font-size: 20px;
         fill: white;
-        text-anchor: start;
+        text-anchor: end;
         white-space: pre;
       }}
     </style>
   </defs>
   <image href="file://{}" x="0" y="0" width="{width}" height="{height}" />
-  {balance_element}
   <text class="quote" x="{}" y="{}">
       {tspan_elements}
   </text>
   {author_element}
+  {balance_element}
 </svg>"#,
 		bg_image_path.display(),
-		width / 2 + 40,
+		quote_x,
 		quote_y,
 	);
 
