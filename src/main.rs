@@ -377,9 +377,14 @@ fn render_svg_to_png(svg_content: &str, output_path: &PathBuf, width: u32, heigh
 	let mut fontdb = fontdb::Database::new();
 	fontdb.load_system_fonts();
 
-	// Load our custom font
-	let font_path = std::env::current_dir()?.join("assets/DejaVuSansMono.ttf");
-	fontdb.load_font_file(&font_path)?;
+	// Try to load DejaVu Sans Mono from common locations (for dev environment)
+	// In production, it should be available via system fonts
+	let dev_font_path = std::env::current_dir().ok().map(|p| p.join("assets/DejaVuSansMono.ttf"));
+	if let Some(path) = dev_font_path {
+		if path.exists() {
+			let _ = fontdb.load_font_file(&path); // Ignore errors, system fonts are already loaded
+		}
+	}
 
 	let mut options = usvg::Options::default();
 	options.fontdb = std::sync::Arc::new(fontdb);

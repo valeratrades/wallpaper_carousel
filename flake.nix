@@ -55,11 +55,26 @@
 
               buildInputs = with pkgs; [
                 openssl.dev
+                dejavu_fonts
               ];
               nativeBuildInputs = with pkgs; [ pkg-config ];
 
               cargoLock.lockFile = ./Cargo.lock;
               src = pkgs.lib.cleanSource ./.;
+
+              # Make DejaVu fonts available at runtime
+              postInstall = ''
+                mkdir -p $out/share/fonts
+                ln -s ${pkgs.dejavu_fonts}/share/fonts/truetype $out/share/fonts/truetype
+              '';
+
+              # Set FONTCONFIG_PATH to include our fonts
+              makeWrapperArgs = [
+                "--prefix"
+                "FONTCONFIG_PATH"
+                ":"
+                "$out/share/fonts"
+              ];
             };
           };
 
