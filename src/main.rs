@@ -4,7 +4,10 @@ use std::{
 };
 
 use clap::Parser;
-use color_eyre::Result;
+use color_eyre::{
+	Result,
+	eyre::{Context, ContextCompat, bail},
+};
 use image::GenericImageView;
 use rand::prelude::IndexedRandom;
 use serde::Deserialize;
@@ -41,6 +44,9 @@ enum Command {
 		/// Select a random image
 		#[arg(short, long, conflicts_with_all = ["forward", "backwards"])]
 		random: bool,
+
+		/// Optional directory to use instead of the parent of last input
+		directory: Option<PathBuf>,
 	},
 }
 
@@ -89,8 +95,12 @@ fn get_supported_image_extensions() -> Vec<&'static str> {
 	vec!["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "tiff", "tif"]
 }
 
-fn find_next_image(current_path: &Path, backwards: bool) -> Result<PathBuf> {
-	let parent = current_path.parent().ok_or_else(|| color_eyre::eyre::eyre!("Current image has no parent directory"))?;
+fn find_next_image(current_path: &Path, backwards: bool, directory: Option<&Path>) -> Result<PathBuf> {
+	let parent = if let Some(dir) = directory {
+		dir
+	} else {
+		current_path.parent().context("Current image has no parent directory")?
+	};
 
 	// Get all image files in the directory
 	let mut image_files: Vec<PathBuf> = std::fs::read_dir(parent)?
@@ -107,34 +117,43 @@ fn find_next_image(current_path: &Path, backwards: bool) -> Result<PathBuf> {
 		.collect();
 
 	if image_files.is_empty() {
-		return Err(color_eyre::eyre::eyre!("No images found in directory: {}", parent.display()));
+		bail!("No images found in directory: {}", parent.display());
 	}
 
 	// Sort files for consistent ordering
 	image_files.sort();
 
-	// Find current file index
-	let current_index = image_files
-		.iter()
-		.position(|p| p == current_path)
-		.ok_or_else(|| color_eyre::eyre::eyre!("Current file not found in directory listing"))?;
+	if image_files.len() == 1 {
+		bail!("Only one image in directory: {}", parent.display());
+	}
+
+	// Find current file index - if directory was provided and current file is not in it,
+	// start from the first or last image depending on direction
+	let current_index = image_files.iter().position(|p| p == current_path);
 
 	// Calculate next index
-	let next_index = if backwards {
-		if current_index == 0 { image_files.len() - 1 } else { current_index - 1 }
-	} else {
-		(current_index + 1) % image_files.len()
+	let next_index = match current_index {
+		Some(idx) =>
+			if backwards {
+				if idx == 0 { image_files.len() - 1 } else { idx - 1 }
+			} else {
+				(idx + 1) % image_files.len()
+			},
+		None => {
+			// Current file not in this directory, start from beginning or end
+			if backwards { image_files.len() - 1 } else { 0 }
+		}
 	};
-
-	if image_files.len() == 1 {
-		return Err(color_eyre::eyre::eyre!("Only one image in directory: {}", parent.display()));
-	}
 
 	Ok(image_files[next_index].clone())
 }
 
-fn find_random_image(current_path: &Path) -> Result<PathBuf> {
-	let parent = current_path.parent().ok_or_else(|| color_eyre::eyre::eyre!("Current image has no parent directory"))?;
+fn find_random_image(current_path: &Path, directory: Option<&Path>) -> Result<PathBuf> {
+	let parent = if let Some(dir) = directory {
+		dir
+	} else {
+		current_path.parent().context("Current image has no parent directory")?
+	};
 
 	// Get all image files in the directory
 	let mut image_files: Vec<PathBuf> = std::fs::read_dir(parent)?
@@ -151,21 +170,21 @@ fn find_random_image(current_path: &Path) -> Result<PathBuf> {
 		.collect();
 
 	if image_files.is_empty() {
-		return Err(color_eyre::eyre::eyre!("No images found in directory: {}", parent.display()));
+		bail!("No images found in directory: {}", parent.display());
 	}
 
 	// Sort files for consistent ordering
 	image_files.sort();
 
-	// Remove current file from the list
+	// Remove current file from the list (only if it's in this directory)
 	image_files.retain(|p| p != current_path);
 
 	if image_files.is_empty() {
-		return Err(color_eyre::eyre::eyre!("Only one image in directory: {}", parent.display()));
+		bail!("Only one image in directory: {}", parent.display());
 	}
 
 	// Select a random image
-	let random_image = image_files.choose(&mut rand::rng()).ok_or_else(|| color_eyre::eyre::eyre!("Failed to select random image"))?;
+	let random_image = image_files.choose(&mut rand::rng()).context("Failed to select random image")?;
 
 	Ok(random_image.clone())
 }
@@ -176,7 +195,7 @@ fn check_and_handle_lock() -> Result<()> {
 	if lock_path.exists() {
 		// Read PID from lock file
 		let pid_str = std::fs::read_to_string(&lock_path)?;
-		let pid: i32 = pid_str.trim().parse().map_err(|_| color_eyre::eyre::eyre!("Invalid PID in lock file"))?;
+		let pid: i32 = pid_str.trim().parse().context("Invalid PID in lock file")?;
 
 		// Try to kill the process
 		v_utils::elog!("Found existing process (PID: {}), killing it...", pid);
@@ -227,12 +246,10 @@ fn save_last_input(path: &Path) -> Result<()> {
 
 fn load_last_input() -> Result<PathBuf> {
 	let cache_path = get_cache_file_path();
-	let content = std::fs::read_to_string(&cache_path).map_err(|_| {
-		color_eyre::eyre::eyre!(
-			"No input file provided and no cached input file found.\n\
-			Please provide an input file: wallpaper_carousel <path-to-image>"
-		)
-	})?;
+	let content = std::fs::read_to_string(&cache_path).context(
+		"No input file provided and no cached input file found.\n\
+		Please provide an input file: wallpaper_carousel <path-to-image>",
+	)?;
 	Ok(PathBuf::from(content.trim()))
 }
 
@@ -248,7 +265,7 @@ fn generate_wallpaper(input_path: &Path) -> Result<()> {
 	let config = AppConfig::read(None)?;
 
 	// Select a random quote
-	let quote = config.quotes.choose(&mut rand::rng()).ok_or_else(|| color_eyre::eyre::eyre!("No quotes configured"))?;
+	let quote = config.quotes.choose(&mut rand::rng()).context("No quotes configured")?;
 	v_utils::elog!("Selected quote: {:?}", quote.text);
 	v_utils::elog!("Author: {:?}", quote.author);
 
@@ -321,21 +338,25 @@ fn generate_wallpaper(input_path: &Path) -> Result<()> {
 	Ok(())
 }
 
-fn handle_next_command(backwards: bool, random: bool) -> Result<()> {
-	info!("Circle command: backwards={}, random={}", backwards, random);
+fn handle_next_command(backwards: bool, random: bool, directory: Option<PathBuf>) -> Result<()> {
+	info!("Circle command: backwards={}, random={}, directory={:?}", backwards, random, directory);
 
 	// Load the current image path
 	let current_path = load_last_input()?;
 
-	// Print the parent directory
-	let parent = current_path.parent().ok_or_else(|| color_eyre::eyre::eyre!("Current image has no parent directory"))?;
-	v_utils::log!("Directory: {}", parent.display());
+	// Determine which directory to use
+	let target_dir = if let Some(ref dir) = directory {
+		dir.as_path()
+	} else {
+		current_path.parent().context("Current image has no parent directory")?
+	};
+	v_utils::log!("Directory: {}", target_dir.display());
 
 	// Find next image
 	let next_path = if random {
-		find_random_image(&current_path)?
+		find_random_image(&current_path, directory.as_deref())?
 	} else {
-		find_next_image(&current_path, backwards)?
+		find_next_image(&current_path, backwards, directory.as_deref())?
 	};
 	v_utils::log!("Next image: {}", next_path.display());
 
@@ -371,13 +392,18 @@ fn run() -> Result<()> {
 
 	// Handle subcommands
 	match args.command {
-		Command::Circle { forward, backwards, random } => {
+		Command::Circle {
+			forward,
+			backwards,
+			random,
+			directory,
+		} => {
 			// Require at least one flag
 			if !forward && !backwards && !random {
-				return Err(color_eyre::eyre::eyre!("Please specify either --forward, --backwards, or --random"));
+				bail!("Please specify either --forward, --backwards, or --random");
 			}
 			// backwards takes precedence if both are somehow set, then random
-			handle_next_command(backwards, random)
+			handle_next_command(backwards, random, directory)
 		}
 		Command::Extend { input } => {
 			// Check and handle existing lock (kill previous background process if running)
@@ -409,7 +435,7 @@ fn run() -> Result<()> {
 fn get_display_resolution() -> Result<(u32, u32)> {
 	let output = ProcessCommand::new("swaymsg").args(["-t", "get_outputs"]).output()?;
 	let outputs: Vec<SwayOutput> = serde_json::from_slice(&output.stdout)?;
-	let output = outputs.iter().find(|o| o.active).ok_or_else(|| color_eyre::eyre::eyre!("No active outputs found"))?;
+	let output = outputs.iter().find(|o| o.active).context("No active outputs found")?;
 	Ok((output.current_mode.width, output.current_mode.height))
 }
 
@@ -674,14 +700,14 @@ fn composite_text_on_image(params: &CompositeParams) -> Result<()> {
 	let tree = usvg::Tree::from_str(&svg_content, &options)?;
 
 	// Render text SVG to a transparent pixmap
-	let mut text_pixmap = tiny_skia::Pixmap::new(params.width, params.height).ok_or_else(|| color_eyre::eyre::eyre!("Failed to create pixmap"))?;
+	let mut text_pixmap = tiny_skia::Pixmap::new(params.width, params.height).context("Failed to create pixmap")?;
 
 	resvg::render(&tree, tiny_skia::Transform::default(), &mut text_pixmap.as_mut());
 
 	// Composite text layer onto background image
 	for y in 0..params.height {
 		for x in 0..params.width {
-			let text_pixel = text_pixmap.pixel(x, y).ok_or_else(|| color_eyre::eyre::eyre!("Failed to get pixel"))?;
+			let text_pixel = text_pixmap.pixel(x, y).context("Failed to get pixel")?;
 			let alpha = text_pixel.alpha();
 
 			if alpha > 0 {
