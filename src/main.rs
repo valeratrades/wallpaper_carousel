@@ -31,12 +31,16 @@ enum Command {
 	/// Circle through images in the same directory
 	Circle {
 		/// Go forwards
-		#[arg(short, long, conflicts_with = "backwards")]
+		#[arg(short, long, conflicts_with_all = ["backwards", "random"])]
 		forward: bool,
 
 		/// Go backwards
-		#[arg(short, long, conflicts_with = "forward")]
+		#[arg(short, long, conflicts_with_all = ["forward", "random"])]
 		backwards: bool,
+
+		/// Select a random image
+		#[arg(short, long, conflicts_with_all = ["forward", "backwards"])]
+		random: bool,
 	},
 }
 
@@ -127,6 +131,43 @@ fn find_next_image(current_path: &Path, backwards: bool) -> Result<PathBuf> {
 	}
 
 	Ok(image_files[next_index].clone())
+}
+
+fn find_random_image(current_path: &Path) -> Result<PathBuf> {
+	let parent = current_path.parent().ok_or_else(|| color_eyre::eyre::eyre!("Current image has no parent directory"))?;
+
+	// Get all image files in the directory
+	let mut image_files: Vec<PathBuf> = std::fs::read_dir(parent)?
+		.filter_map(|entry| entry.ok())
+		.map(|entry| entry.path())
+		.filter(|path| {
+			path.is_file()
+				&& path
+					.extension()
+					.and_then(|ext| ext.to_str())
+					.map(|ext| get_supported_image_extensions().contains(&ext.to_lowercase().as_str()))
+					.unwrap_or(false)
+		})
+		.collect();
+
+	if image_files.is_empty() {
+		return Err(color_eyre::eyre::eyre!("No images found in directory: {}", parent.display()));
+	}
+
+	// Sort files for consistent ordering
+	image_files.sort();
+
+	// Remove current file from the list
+	image_files.retain(|p| p != current_path);
+
+	if image_files.is_empty() {
+		return Err(color_eyre::eyre::eyre!("Only one image in directory: {}", parent.display()));
+	}
+
+	// Select a random image
+	let random_image = image_files.choose(&mut rand::rng()).ok_or_else(|| color_eyre::eyre::eyre!("Failed to select random image"))?;
+
+	Ok(random_image.clone())
 }
 
 fn check_and_handle_lock() -> Result<()> {
@@ -280,8 +321,8 @@ fn generate_wallpaper(input_path: &Path) -> Result<()> {
 	Ok(())
 }
 
-fn handle_next_command(backwards: bool) -> Result<()> {
-	info!("Circle command: backwards={}", backwards);
+fn handle_next_command(backwards: bool, random: bool) -> Result<()> {
+	info!("Circle command: backwards={}, random={}", backwards, random);
 
 	// Load the current image path
 	let current_path = load_last_input()?;
@@ -291,7 +332,11 @@ fn handle_next_command(backwards: bool) -> Result<()> {
 	v_utils::log!("Directory: {}", parent.display());
 
 	// Find next image
-	let next_path = find_next_image(&current_path, backwards)?;
+	let next_path = if random {
+		find_random_image(&current_path)?
+	} else {
+		find_next_image(&current_path, backwards)?
+	};
 	v_utils::log!("Next image: {}", next_path.display());
 
 	// Check for existing lock and kill if necessary
@@ -326,13 +371,13 @@ fn run() -> Result<()> {
 
 	// Handle subcommands
 	match args.command {
-		Command::Circle { forward, backwards } => {
+		Command::Circle { forward, backwards, random } => {
 			// Require at least one flag
-			if !forward && !backwards {
-				return Err(color_eyre::eyre::eyre!("Please specify either --forward or --backwards"));
+			if !forward && !backwards && !random {
+				return Err(color_eyre::eyre::eyre!("Please specify either --forward, --backwards, or --random"));
 			}
-			// backwards takes precedence if both are somehow set
-			handle_next_command(backwards)
+			// backwards takes precedence if both are somehow set, then random
+			handle_next_command(backwards, random)
 		}
 		Command::Extend { input } => {
 			// Check and handle existing lock (kill previous background process if running)
