@@ -13,7 +13,7 @@ use rand::prelude::IndexedRandom;
 use serde::Deserialize;
 use tracing::info;
 use v_utils::utils::eyre::exit_on_error;
-use wallpaper_carousel::config::AppConfig;
+use wallpaper_carousel::config::{AppConfig, SettingsFlags};
 
 #[derive(Debug, Parser)]
 #[command(name = "wallpaper_carousel")]
@@ -21,6 +21,8 @@ use wallpaper_carousel::config::AppConfig;
 struct Args {
 	#[command(subcommand)]
 	command: Command,
+	#[command(flatten)]
+	settings: SettingsFlags,
 }
 
 #[derive(Debug, Parser)]
@@ -258,11 +260,8 @@ fn main() {
 	exit_on_error(run());
 }
 
-fn generate_wallpaper(input_path: &Path) -> Result<()> {
+fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
 	info!("Starting wallpaper generation for: {}", input_path.display());
-
-	// Load config
-	let config = AppConfig::read(None)?;
 
 	// Select a random quote
 	let quote = config.quotes.choose(&mut rand::rng()).context("No quotes configured")?;
@@ -406,6 +405,9 @@ fn run() -> Result<()> {
 			handle_next_command(backwards, random, directory)
 		}
 		Command::Extend { input } => {
+			// Load config from CLI flags
+			let config = AppConfig::try_build(args.settings)?;
+
 			// Check and handle existing lock (kill previous background process if running)
 			check_and_handle_lock()?;
 
@@ -419,7 +421,7 @@ fn run() -> Result<()> {
 			};
 
 			// Generate wallpaper
-			let result = generate_wallpaper(&input_path);
+			let result = generate_wallpaper(&input_path, &config);
 
 			// Remove lock
 			remove_lock()?;
