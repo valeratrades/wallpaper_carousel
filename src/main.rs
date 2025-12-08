@@ -516,8 +516,10 @@ fn resize_fill(img: image::DynamicImage, target_width: u32, target_height: u32) 
 	};
 
 	let resized = img.resize_exact(scaled_width, scaled_height, imageops::FilterType::Lanczos3);
-	let x_offset = (scaled_width.saturating_sub(target_width)) / 2;
-	let y_offset = (scaled_height.saturating_sub(target_height)) / 2;
+
+	// Crop from right/bottom (keep left/top aligned) since content typically starts there
+	let x_offset = 0;
+	let y_offset = 0;
 
 	DynamicImage::ImageRgba8(imageops::crop_imm(&resized.to_rgba8(), x_offset, y_offset, target_width, target_height).to_image())
 }
