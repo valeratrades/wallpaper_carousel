@@ -56,6 +56,9 @@
                 nativeBuildInputs = [ pkgs.typst ];
 
                 buildPhase = ''
+                  mkdir -p .cache/typst/packages/preview
+                  ln -s ${pkgs.typstPackages.wrap-it}/lib/typst-packages/wrap-it .cache/typst/packages/preview/wrap-it
+                  export XDG_CACHE_HOME=$(pwd)/.cache
                   typst compile src_typ/vision.typ output.pdf
                   typst compile --format png src_typ/vision.typ output{n}.png
                   if [ -f output2.png ]; then
