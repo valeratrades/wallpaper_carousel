@@ -33,6 +33,9 @@ enum Command {
 		input: Option<PathBuf>,
 	},
 
+	/// Generate wallpaper using the bundled vision document
+	Generate,
+
 	/// Circle through images in the same directory
 	Circle {
 		/// Go forwards
@@ -95,6 +98,126 @@ fn get_lock_file_path() -> PathBuf {
 fn get_supported_image_extensions() -> Vec<&'static str> {
 	// Based on image crate's supported formats
 	vec!["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "tiff", "tif"]
+}
+
+fn get_vision_paths() -> Result<(PathBuf, PathBuf)> {
+	// Returns (vision.png path, src_typ directory path)
+	// When installed via nix, structure is: $out/bin/wallpaper_carousel and $out/share/vision/
+	let exe_path = std::env::current_exe()?;
+	let exe_dir = exe_path.parent().context("Executable has no parent directory")?;
+
+	// Go up from bin/ to $out/, then into share/vision/
+	let vision_dir = exe_dir.parent().context("bin directory has no parent")?.join("share/vision");
+	let vision_png = vision_dir.join("vision.png");
+	let src_typ = vision_dir.join("src_typ");
+
+	if vision_png.exists() && src_typ.exists() {
+		return Ok((vision_png, src_typ));
+	}
+
+	// Fallback: check if we're in development
+	let cwd = std::env::current_dir()?;
+	let dev_png = cwd.join("src_typ/output.png");
+	let dev_src = cwd.join("src_typ");
+
+	if dev_src.exists() {
+		return Ok((dev_png, dev_src));
+	}
+
+	bail!(
+		"Could not find bundled vision files. Checked:\n  - {}\n  - {}\nMake sure the package was built with `nix build`.",
+		vision_dir.display(),
+		dev_src.display()
+	)
+}
+
+fn get_newest_source_mtime(src_typ_dir: &Path) -> Result<std::time::SystemTime> {
+	let mut newest = std::time::SystemTime::UNIX_EPOCH;
+
+	for entry in walkdir::WalkDir::new(src_typ_dir).into_iter().filter_map(|e| e.ok()) {
+		if entry.file_type().is_file() {
+			let path = entry.path();
+			// Skip the output files
+			if path.file_name().map(|n| n.to_string_lossy().starts_with("output")).unwrap_or(false) {
+				continue;
+			}
+			if let Ok(metadata) = path.metadata() {
+				if let Ok(mtime) = metadata.modified() {
+					if mtime > newest {
+						newest = mtime;
+					}
+				}
+			}
+		}
+	}
+
+	Ok(newest)
+}
+
+fn regenerate_vision_if_needed() -> Result<PathBuf> {
+	let (vision_png, src_typ) = get_vision_paths()?;
+
+	// Check if we need to regenerate
+	let needs_regeneration = if vision_png.exists() {
+		let png_mtime = vision_png.metadata()?.modified()?;
+		let src_mtime = get_newest_source_mtime(&src_typ)?;
+		src_mtime > png_mtime
+	} else {
+		true
+	};
+
+	if needs_regeneration {
+		v_utils::log!("Vision sources are newer than output, regenerating...");
+
+		// Create a temporary directory for compilation
+		let temp_dir = std::env::temp_dir().join("wallpaper_carousel_typst");
+		std::fs::create_dir_all(&temp_dir)?;
+
+		// Copy source files to temp dir (in case src_typ is read-only in nix store)
+		for entry in walkdir::WalkDir::new(&src_typ).into_iter().filter_map(|e| e.ok()) {
+			let rel_path = entry.path().strip_prefix(&src_typ)?;
+			let dest = temp_dir.join(rel_path);
+			if entry.file_type().is_dir() {
+				std::fs::create_dir_all(&dest)?;
+			} else if entry.file_type().is_file() {
+				if let Some(parent) = dest.parent() {
+					std::fs::create_dir_all(parent)?;
+				}
+				std::fs::copy(entry.path(), &dest)?;
+			}
+		}
+
+		// Compile with typst
+		let output = ProcessCommand::new("typst")
+			.args(["compile", "--format", "png", "vision.typ", "output{n}.png"])
+			.current_dir(&temp_dir)
+			.output()?;
+
+		if !output.status.success() {
+			bail!("typst compilation failed:\n{}", String::from_utf8_lossy(&output.stderr));
+		}
+
+		// Check for single page
+		if temp_dir.join("output2.png").exists() {
+			bail!("Error: More than 1 page generated. Vision document must be single-page.");
+		}
+
+		// Copy output to vision_png location (if writable) or to a cache location
+		let output_png = temp_dir.join("output1.png");
+		let final_path = if std::fs::copy(&output_png, &vision_png).is_ok() {
+			vision_png
+		} else {
+			// Can't write to nix store, use a cache location
+			let cache_vision = v_utils::xdg_cache_file!("vision.png");
+			std::fs::copy(&output_png, &cache_vision)?;
+			cache_vision
+		};
+
+		v_utils::log!("Regenerated vision document: {}", final_path.display());
+		Ok(final_path)
+	} else {
+		Ok(vision_png)
+	}
 }
 
 fn find_next_image(current_path: &Path, backwards: bool, directory: Option<&Path>) -> Result<PathBuf> {
@@ -428,6 +551,31 @@ fn run() -> Result<()> {
 
 			// Save the input path to cache for next time
 			save_last_input(&input_path)?;
+
+			result
+		}
+		Command::Generate => {
+			// Load config from CLI flags
+			let config = AppConfig::try_build(args.settings)?;
+
+			// Check and handle existing lock (kill previous background process if running)
+			check_and_handle_lock()?;
+
+			// Create lock for this process
+			create_lock()?;
+
+			// Get the bundled vision image path, regenerating if needed
+			let vision_path = regenerate_vision_if_needed()?;
+			v_utils::log!("Using vision image: {}", vision_path.display());
+
+			// Generate wallpaper using the vision document
+			let result = generate_wallpaper(&vision_path, &config);
+
+			// Remove lock
+			remove_lock()?;
+
+			// Save the vision path to cache (so extend without args also uses vision)
+			save_last_input(&vision_path)?;
 
 			result
 		}

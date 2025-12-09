@@ -48,6 +48,29 @@
               rustPlatform = pkgs.makeRustPlatform {
                 inherit rustc cargo stdenv;
               };
+
+              visionDocument = pkgs.stdenvNoCC.mkDerivation {
+                name = "vision-document";
+                src = ./.;
+
+                nativeBuildInputs = [ pkgs.typst ];
+
+                buildPhase = ''
+                  typst compile src_typ/vision.typ output.pdf
+                  typst compile --format png src_typ/vision.typ output{n}.png
+                  if [ -f output2.png ]; then
+                    echo "Error: More than 1 page generated. Vision document must be single-page."
+                    exit 1
+                  fi
+                  mv output1.png output.png
+                '';
+
+                installPhase = ''
+                  mkdir -p $out
+                  cp output.pdf $out/
+                  cp output.png $out/
+                '';
+              };
             in
             {
               default = rustPlatform.buildRustPackage rec {
@@ -67,6 +90,15 @@
                 postInstall = ''
                   mkdir -p $out/share/fonts
                   ln -s ${pkgs.dejavu_fonts}/share/fonts/truetype $out/share/fonts/truetype
+
+                  # Include vision document (pre-built output)
+                  mkdir -p $out/share/vision
+                  cp ${visionDocument}/output.png $out/share/vision/vision.png
+                  cp ${visionDocument}/output.pdf $out/share/vision/vision.pdf
+
+                  # Include vision source for runtime regeneration
+                  mkdir -p $out/share/vision/src_typ
+                  cp -r ${./src_typ}/* $out/share/vision/src_typ/
                 '';
 
                 # Set FONTCONFIG_PATH to include our fonts
@@ -77,6 +109,8 @@
                   "$out/share/fonts"
                 ];
               };
+
+              vision = visionDocument;
             };
 
           devShells.default =

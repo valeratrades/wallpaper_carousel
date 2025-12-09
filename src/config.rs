@@ -33,7 +33,7 @@ impl Balance {
 
 		if !output.status.success() {
 			let stderr = String::from_utf8_lossy(&output.stderr);
-			bail!("Balance command failed: {}", stderr);
+			bail!("Balance command failed: {stderr}");
 		}
 
 		let stdout = String::from_utf8(output.stdout)?;

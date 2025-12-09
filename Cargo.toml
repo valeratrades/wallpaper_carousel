@@ -23,6 +23,7 @@ tiny-skia = "^0.11"
 tracing = "^0.1"
 usvg = "^0.45"
 v_utils = { version = "2.13.1", features = ["tracing", "cli"] }
+walkdir = "^2"
 xdg = "^3"
 
 [lints.clippy]

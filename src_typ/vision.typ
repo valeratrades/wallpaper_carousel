@@ -1,0 +1,61 @@
+#set page(
+  width: 1920pt,
+  height: 1080pt,
+  fill: rgb("#333333"),
+  margin: 40pt,
+)
+#set text(size: 11pt, fill: white)
+
+//TODO: add an artificially aged photo of myself at age 25/30
+
+= vision
+target Valeriy Sakharov is a trader worth 25M\$
+
+world-class at building accurate predictions; updates them fast and accurately when new relevant information comes out; which he has systems to track, for each of the outstanding positions. PhD-level at math; has made academic contributions on ideas introduced in Martin Schmid's papers, and on general RM solutions. Does focus-meditation to train ability to deep-work in isolation.
+
+casually swings deci-million positions; but very careful about the risk-management. Prefers to pyramid in when right; risking only existing profit whenever possible. Able to size the trades quickly and precisely, due to weekly playing poker at a high level.
+
+has automatic rm systems, removing the need to worry about psychology. Doesn't have to worry about slippage, as algorthims are in-place to regulate that. His quant hedge-fund Liquid Alpha employes 6 people, including 1 math PhD; with practically 0 churn, as #link("https://www.instagram.com/p/DRsoKzhETqG/")[he ensures that every employee can achieve his goals within the organization].
+
+he is ruthlessly pain-seeking, only pursuing delayed gratification.
+
+== tangible
+//TODO: embed the image inside the text block, similar to how I did it for the MTU td
+- drives #figure(
+  image("./assets/Mercedez_S-class_Berline.png", width: 20%),
+  caption: [ Mercedez S-class ],
+)
+- lives in Switzerland
+- owns a house on a ski slope (~1.4\$M).
+  Goes there for 1-2 weeks yearly; planning the life for the next year, in semi-seclusion
+- owns a 10k Rolex, but prefers wearing G-shock over it
+
+
+== fitness
+can do all of:
+- planche
+- front-lever
+- 1+ one-arm pull-up on each hand
+- hand-stand pushups
+
+// additional indicators of fitness could be: {visible abs, bicep vein, etc}, but I'm pretty sure the perf-based metrics above already force all the cosmetics in order
+
+== family
+married to someone who increases his productive output /*(likely Priscilia)*/. No kids yet, but is in a position to easily provide for them if needed.
+
+Besides being in such arrangement, keeps strict rules about what food and other temptations can physically be in the house (or in reach). Is very careful about reinforcement rules for himself and everyone he often comes in contact with.
+
+= other
+== optimize for
+a single metric to tie-brake decisions
+_*drawdown protection*_
+
+== target beliefs
+/*
+section where I list beliefs that need to be updated.
+
+to compile, - list all the beliefs/opinions/feelings that have prevented you from having had achieved the goal already. 
+*/
+
+== habits to establish
+- note down distractions
