@@ -874,6 +874,41 @@ fn composite_text_on_image(params: &CompositeParams) -> Result<()> {
 		}
 	}
 
+	// Draw a tiny 1px border at the safe area boundary
+	// This prevents sway from auto-resizing when the wallpaper matches display dimensions
+	let border_color = image::Rgba([255u8, 0, 0, 255]); // Red for visibility during testing
+	let sa = params.safe_area;
+
+	// Top border (at y = safe_area.y)
+	if sa.y > 0 && sa.y < params.height {
+		for x in sa.x..sa.x.saturating_add(sa.width).min(params.width) {
+			bg_image.put_pixel(x, sa.y, border_color);
+		}
+	}
+
+	// Bottom border (at y = safe_area.y + safe_area.height - 1)
+	let bottom_y = sa.y.saturating_add(sa.height).saturating_sub(1);
+	if bottom_y < params.height {
+		for x in sa.x..sa.x.saturating_add(sa.width).min(params.width) {
+			bg_image.put_pixel(x, bottom_y, border_color);
+		}
+	}
+
+	// Left border (at x = safe_area.x)
+	if sa.x > 0 && sa.x < params.width {
+		for y in sa.y..sa.y.saturating_add(sa.height).min(params.height) {
+			bg_image.put_pixel(sa.x, y, border_color);
+		}
+	}
+
+	// Right border (at x = safe_area.x + safe_area.width - 1)
+	let right_x = sa.x.saturating_add(sa.width).saturating_sub(1);
+	if right_x < params.width {
+		for y in sa.y..sa.y.saturating_add(sa.height).min(params.height) {
+			bg_image.put_pixel(right_x, y, border_color);
+		}
+	}
+
 	// Save the composited image
 	bg_image.save(params.output_path)?;
 
