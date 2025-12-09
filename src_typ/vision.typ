@@ -1,10 +1,14 @@
+#import "@preview/wrap-it:0.1.1": wrap-content
+
 #set page(
   width: 1920pt,
   height: 1080pt,
   fill: rgb("#333333"),
-  margin: 40pt,
+  margin: 30pt,
+  columns: 3,
 )
 #set text(size: 11pt, fill: white)
+#set columns(gutter: 40pt)
 
 //TODO: add an artificially aged photo of myself at age 25/30
 
@@ -20,13 +24,24 @@ has automatic rm systems, removing the need to worry about psychology. Doesn't h
 he is ruthlessly pain-seeking, only pursuing delayed gratification.
 
 == tangible
-//TODO: embed the image inside the text block, similar to how I did it for the MTU td
-- drives #figure(
-  image("./assets/Mercedez_S-class_Berline.png", width: 20%),
-  caption: [ Mercedez S-class ],
-)
-- lives in Switzerland
-- owns a house on a ski slope (~1.4\$M).
+#wrap-content(
+  align: right,
+  image("./assets/Mercedez_S-class_Berline.png", width: 40%),
+)[
+- drives a Mercedes S-class
+] 
+#wrap-content(
+  align: right,
+  image("./assets/apt_main.jpg", width: 40%),
+)[
+- lives in #link("https://moscowestates.com/property/apartment-110-sqm-on-the-56th-floor-in-the-federation-tower/")[Moscow City]
+]
+#wrap-content(
+  align: right,
+  image("./assets/ski_slope_house.jpg", width: 40%),
+)[
+  - owns a house on a ski slope (~1.4\$M) in Switzerland.
+]
   Goes there for 1-2 weeks yearly; planning the life for the next year, in semi-seclusion
 - owns a 10k Rolex, but prefers wearing G-shock over it
 
@@ -56,6 +71,9 @@ section where I list beliefs that need to be updated.
 
 to compile, - list all the beliefs/opinions/feelings that have prevented you from having had achieved the goal already. 
 */
+for each of these, imagine a picture where the statement is true, and you have a good feeling in relation to it.
+- math is one of the most fun things I can do, beating any other leasurely activity
+- excruciatingly analyzing and recording my trades, then comparing tiniest of similarities on history, is one of the most rewarding things to do.
 
 == habits to establish
 - note down distractions
