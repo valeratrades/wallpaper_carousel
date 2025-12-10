@@ -19,7 +19,12 @@ world-class at building accurate predictions; updates them fast and accurately w
 
 casually swings deci-million positions; but very careful about the risk-management. Prefers to pyramid in when right; risking only existing profit whenever possible. Able to size the trades quickly and precisely, due to weekly playing poker at a high level.
 
+#wrap-content(
+  align: right,
+  image("./assets/sbf_desk.png", width: 40%),
+)[
 has automatic rm systems, removing the need to worry about psychology. Doesn't have to worry about slippage, as algorthims are in-place to regulate that. His quant hedge-fund Liquid Alpha employes 6 people, including 1 math PhD; with practically 0 churn, as #link("https://www.instagram.com/p/DRsoKzhETqG/")[he ensures that every employee can achieve his goals within the organization].
+]
 
 he is ruthlessly pain-seeking, only pursuing delayed gratification. Deep work is the most rewarding experience for him.
 
