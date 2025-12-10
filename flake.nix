@@ -61,7 +61,7 @@
 
                 buildPhase = ''
                   mkdir -p .cache/typst/packages/preview/wrap-it
-                  ln -s ${wrap-it} .cache/typst/packages/preview/wrap-it/0.1.1
+                  ln -sfn ${wrap-it} .cache/typst/packages/preview/wrap-it/0.1.1
                   export XDG_CACHE_HOME=$(pwd)/.cache
                   typst compile src_typ/vision.typ output.pdf
                   typst compile --format png src_typ/vision.typ output{n}.png
