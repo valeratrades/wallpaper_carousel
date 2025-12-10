@@ -21,7 +21,7 @@ casually swings deci-million positions; but very careful about the risk-manageme
 
 has automatic rm systems, removing the need to worry about psychology. Doesn't have to worry about slippage, as algorthims are in-place to regulate that. His quant hedge-fund Liquid Alpha employes 6 people, including 1 math PhD; with practically 0 churn, as #link("https://www.instagram.com/p/DRsoKzhETqG/")[he ensures that every employee can achieve his goals within the organization].
 
-he is ruthlessly pain-seeking, only pursuing delayed gratification.
+he is ruthlessly pain-seeking, only pursuing delayed gratification. Deep work is the most rewarding experience for him.
 
 == tangible
 #wrap-content(
@@ -43,7 +43,7 @@ he is ruthlessly pain-seeking, only pursuing delayed gratification.
   - owns a house on a ski slope (~1.4\$M) in Switzerland.
 ]
   Goes there for 1-2 weeks yearly; planning the life for the next year, in semi-seclusion
-- owns a 10k Rolex, but prefers wearing G-shock over it
+- owns a 10k Rolex, but prefers wearing Casio over it
 
 
 == fitness
@@ -56,9 +56,16 @@ can do all of:
 // additional indicators of fitness could be: {visible abs, bicep vein, etc}, but I'm pretty sure the perf-based metrics above already force all the cosmetics in order
 
 == family
+#wrap-content(
+  align: right,
+  image("./assets/AndreySakharov_restored.png", width: 40%),
+)[
 married to someone who increases his productive output /*(likely Priscilia)*/. No kids yet, but is in a position to easily provide for them if needed.
 
 Besides being in such arrangement, keeps strict rules about what food and other temptations can physically be in the house (or in reach). Is very careful about reinforcement rules for himself and everyone he often comes in contact with.
+
+Continues Andrey's legacy. With very stable profits on 25M\$ of capital; it is on track to continue growing exponentially.
+]
 
 = other
 == optimize for
@@ -76,4 +83,4 @@ for each of these, imagine a picture where the statement is true, and you have a
 - excruciatingly analyzing and recording my trades, then comparing tiniest of similarities on history, is one of the most rewarding things to do.
 
 == habits to establish
-- note down distractions
+- note down distractions (that successfully diverted your attention away from work)
