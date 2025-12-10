@@ -1,1 +1,1 @@
-NB: works exclusively on `sway`
+works exclusively on `sway`, and is only meant for me and myself.

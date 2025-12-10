@@ -1,5 +1,5 @@
 > [!WARNING]
-> NB: works exclusively on `sway`
+> works exclusively on `sway`, and is only meant for me and myself.
 
 # wallpaper_carousel
 ![Minimum Supported Rust Version](https://img.shields.io/badge/nightly-1.93+-ab6000.svg)
@@ -19,6 +19,8 @@ Most importantly, should be actively used for decision-making. What would the ta
 
 The `generate` command uses the bundled vision document (in `src_typ/`) as the wallpaper, and will regenerate it from source if the typst files are newer than the output.
 
+# Other
+NB: note to self, - do not `git lfs` it, - nixos build won't be able to deref
 
 
 <br>
