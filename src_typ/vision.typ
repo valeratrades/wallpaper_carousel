@@ -4,8 +4,8 @@
   width: 1920pt,
   height: 1080pt,
   fill: rgb("#333333"),
-  margin: 30pt,
-  columns: 3,
+  margin: (top: 30pt, bottom: 30pt, left: 100pt, right: 300pt),
+  columns: 2,
 )
 #set text(size: 11pt, fill: white)
 #set columns(gutter: 40pt)
