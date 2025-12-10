@@ -60,8 +60,8 @@
                 nativeBuildInputs = [ pkgs.typst ];
 
                 buildPhase = ''
-                  mkdir -p .cache/typst/packages/preview/wrap-it
-                  ln -sfn ${wrap-it} .cache/typst/packages/preview/wrap-it/0.1.1
+                  mkdir -p .cache/typst/packages/local/wrap-it
+                  ln -sfn ${wrap-it} .cache/typst/packages/local/wrap-it/0.1.1
                   export XDG_CACHE_HOME=$(pwd)/.cache
                   typst compile src_typ/vision.typ output.pdf
                   typst compile --format png src_typ/vision.typ output{n}.png
