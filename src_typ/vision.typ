@@ -1,4 +1,4 @@
-#import "@preview/wrap-it:0.1.1": wrap-content
+#import "@local/wrap-it:0.1.1": wrap-content
 
 #set page(
   width: 1920pt,
@@ -45,7 +45,7 @@ he is ruthlessly pain-seeking, only pursuing delayed gratification. Deep work is
   align: right,
   image("./assets/ski_slope_house.jpg", width: 40%),
 )[
-  - owns a house on a ski slope (~1.4\$M) in Switzerland.
+  - owns a house on a ski slope (\~1.4\$M) in Switzerland.
 ]
   Goes there for 1-2 weeks yearly; planning the life for the next year, in semi-seclusion
 - owns a 10k Rolex, but prefers wearing Casio over it
