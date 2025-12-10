@@ -5,8 +5,12 @@
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks.url = "github:cachix/git-hooks.nix";
     v-utils.url = "github:valeratrades/.github";
+    wrap-it = {
+      url = "github:valeratrades/wrap-it/cf3de8ced50c353ccfd534f3bb1ae9f6d5a04788";
+      flake = false;
+    };
   };
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, v-utils }:
+  outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, v-utils, wrap-it }:
     flake-utils.lib.eachDefaultSystem
       (
         system:
@@ -56,8 +60,8 @@
                 nativeBuildInputs = [ pkgs.typst ];
 
                 buildPhase = ''
-                  mkdir -p .cache/typst/packages/preview
-                  ln -s ${pkgs.typstPackages.wrap-it}/lib/typst-packages/wrap-it .cache/typst/packages/preview/wrap-it
+                  mkdir -p .cache/typst/packages/preview/wrap-it
+                  ln -s ${wrap-it} .cache/typst/packages/preview/wrap-it/0.1.1
                   export XDG_CACHE_HOME=$(pwd)/.cache
                   typst compile src_typ/vision.typ output.pdf
                   typst compile --format png src_typ/vision.typ output{n}.png
