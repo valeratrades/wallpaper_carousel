@@ -19,7 +19,7 @@ target Valeriy Sakharov is a trader worth 25M\$
 #wrap(
   image("./assets/MartinSchmid.jpg", width: 30%),
 )[
-world-class at building accurate predictions; updates them fast and accurately when new relevant information comes out; which he has systems to track, for each of the outstanding positions. PhD-level at math; has made academic contributions on ideas introduced in Martin Schmid's papers, and on general RM solutions. Loves reading scientific papers. Does focus-meditation to train ability to deep-work in isolation.
+world-class at building accurate predictions; updates them fast and accurately when new relevant information comes out; which he has systems to track, for each of the outstanding positions. PhD-level at math; has made academic contributions on ideas introduced in Martin Schmid's papers, and on general RM solutions. Loves reading scientific papers. Does focus-meditation to train ability to deep-work in isolation. Is good at prioritization, doesn't get tempted into starting with tasks that look easy. 
 ]
 
 casually swings deci-million positions; but very careful about the risk-management. Prefers to pyramid in when right; risking only existing profit whenever possible. Able to size the trades quickly and precisely, due to weekly playing poker at a high level.
@@ -27,7 +27,7 @@ casually swings deci-million positions; but very careful about the risk-manageme
 #wrap(
   image("./assets/sbf_desk.png", width: 40%),
 )[
-has automatic rm systems, removing the need to worry about psychology. Doesn't have to worry about slippage, as algorthims are in-place to regulate that. His quant hedge-fund Liquid Alpha employes 6 people, including 1 math PhD; with practically 0 churn, as #link("https://www.instagram.com/p/DRsoKzhETqG/")[he ensures that every employee can achieve his goals within the organization].
+has automatic rm systems, removing the need to worry about psychology. Doesn't have to worry about slippage, as algorthims are in-place to regulate that. His quant hedge-fund Liquid Alpha employes 6 people, including 1 math PhD; with practically 0 churn, as #link("https://www.instagram.com/p/DRsoKzhETqG/")[he ensures that every employee can achieve his goals within the organization]. Is #link("https://youtu.be/KZSXFPt4Vqk")[mindful of entropy], - hiring only prospects above average level on the team.
 ]
 
 he is ruthlessly pain-seeking, only pursuing delayed gratification. Deep work is the most rewarding experience for him.
@@ -84,8 +84,11 @@ section where I list beliefs that need to be updated.
 to compile, - list all the beliefs/opinions/feelings that have prevented you from having had achieved the goal already. 
 */
 for each of these, imagine a picture where the statement is true, and you have a good feeling in relation to it.
+
 - math is one of the most fun things I can do, beating any other leasurely activity
 - excruciatingly analyzing and recording my trades, then comparing tiniest of similarities on history, is one of the most rewarding things to do.
+- I love managing people
+- as a business owner, I love that problems, that end up on my table, are the most difficult ones that business has to offer
 
 == habits to establish
 - note down distractions (that successfully diverted your attention away from work)
