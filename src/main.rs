@@ -57,6 +57,7 @@ enum Command {
 
 #[derive(Debug, Deserialize)]
 struct SwayOutput {
+	/// None for inactive outputs (e.g., unplugged HDMI)
 	current_mode: Option<CurrentMode>,
 }
 
