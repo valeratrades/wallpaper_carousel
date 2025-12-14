@@ -57,8 +57,7 @@ enum Command {
 
 #[derive(Debug, Deserialize)]
 struct SwayOutput {
-	current_mode: CurrentMode,
-	active: bool,
+	current_mode: Option<CurrentMode>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -600,7 +599,7 @@ fn get_display_resolution() -> Result<(u32, u32)> {
 fn get_all_active_displays() -> Result<Vec<(u32, u32)>> {
 	let output = ProcessCommand::new("swaymsg").args(["-t", "get_outputs"]).output()?;
 	let outputs: Vec<SwayOutput> = serde_json::from_slice(&output.stdout)?;
-	Ok(outputs.iter().filter(|o| o.active).map(|o| (o.current_mode.width, o.current_mode.height)).collect())
+	Ok(outputs.iter().filter_map(|o| o.current_mode.as_ref().map(|m| (m.width, m.height))).collect())
 }
 
 fn calculate_safe_area(img_width: u32, img_height: u32, displays: &[(u32, u32)]) -> SafeArea {
