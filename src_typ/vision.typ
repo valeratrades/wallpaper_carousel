@@ -59,16 +59,20 @@ can do all of:
 - 1+ one-arm pull-up on each hand
 - hand-stand pushups
 
-// additional indicators of fitness could be: {visible abs, bicep vein, etc}, but I'm pretty sure the perf-based metrics above already force all the cosmetics in order
+// additional indicators of fitness could be: {visible abs, bicep vein, etc}, but I'm pretty sure the perf-based metrics above already force all the cosmetics in order; while also being actionable.
 
 == family
 #wrap(
-  image("./assets/AndreySakharov_restored.png", width: 40%),
+  image("./assets/Priscilia.png", width: 35%),
 )[
 married to someone who increases his productive output /*(likely Priscilia)*/. No kids yet, but is in a position to easily provide for them if needed.
 
 Besides being in such arrangement, keeps strict rules about what food and other temptations can physically be in the house (or in reach). Is very careful about reinforcement rules for himself and everyone he often comes in contact with.
+]
 
+#wrap(
+  image("./assets/AndreySakharov_restored.png", width: 40%),
+)[
 Continues Andrey's legacy. With very stable profits on 25M\$ of capital; it is on track to continue growing exponentially.
 ]
 
