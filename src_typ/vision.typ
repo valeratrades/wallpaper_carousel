@@ -63,7 +63,7 @@ can do all of:
 
 == family
 #wrap(
-  image("./assets/Priscilia.png", width: 35%),
+  image("./assets/Priscilia.png", width: 32%),
 )[
 married to someone who increases his productive output /*(likely Priscilia)*/. No kids yet, but is in a position to easily provide for them if needed.
 
