@@ -1,6 +1,6 @@
+
 > [!WARNING]
 > works exclusively on `sway`, and is only meant for me and myself.
-
 # wallpaper_carousel
 ![Minimum Supported Rust Version](https://img.shields.io/badge/nightly-1.93+-ab6000.svg)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/wallpaper_carousel.svg?color=fc8d62&logo=rust" height="20" style=flat-square>](https://crates.io/crates/wallpaper_carousel)
@@ -12,7 +12,7 @@
 
 extend wallpaper with some random things I care about. Not generalizable in the slightest, only intended to be used by me myself exclusively.
 
-### Vision Document
+#### Vision Document
 Following [Charlie Morgan](https://youtu.be/IUxn7vT104Y?si=xXYJEDzycHf0l8Lu), defining exactly where I must be.
 
 Most importantly, should be actively used for decision-making. What would the target version of myself do? If answer is known, - must follow it. The more difficult to follow, the better, - means that's likely the discrepancy.
@@ -42,3 +42,4 @@ NB: note to self, - do not `git lfs` it, - nixos build won't be able to deref
 for inclusion in this crate by you, as defined in the Apache-2.0 license, shall
 be licensed as above, without any additional terms or conditions.
 </sub>
+
