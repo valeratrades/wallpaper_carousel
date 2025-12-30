@@ -11,7 +11,7 @@ use color_eyre::{
 use image::GenericImageView;
 use rand::prelude::IndexedRandom;
 use serde::Deserialize;
-use tracing::info;
+use tracing::{info, warn};
 use v_utils::utils::eyre::exit_on_error;
 use wallpaper_carousel::config::{AppConfig, SettingsFlags};
 
@@ -393,13 +393,19 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
 
 	// Get balance value if configured
 	let balance_text = if let Some(balance) = &config.balance {
-		let value = balance.get_value()?;
-		if let Some(label) = &balance.label {
-			v_utils::elog!("{}:\n{}", label, value);
-			Some(format!("{}\n{}", label, value))
-		} else {
-			v_utils::elog!("{}", value);
-			Some(value)
+		match balance.get_value() {
+			Ok(value) =>
+				if let Some(label) = &balance.label {
+					v_utils::elog!("{}:\n{}", label, value);
+					Some(format!("{}\n{}", label, value))
+				} else {
+					v_utils::elog!("{}", value);
+					Some(value)
+				},
+			Err(e) => {
+				warn!("Balance command failed: {e}");
+				None
+			}
 		}
 	} else {
 		None
