@@ -19,7 +19,7 @@ target Valeriy Sakharov is a trader worth 25M\$
 #wrap(
   image("./assets/MartinSchmid.jpg", width: 30%),
 )[
-world-class at building accurate predictions; updates them fast and accurately when new relevant information comes out; which he has systems to track, for each of the outstanding positions. PhD-level at math; has made academic contributions on ideas introduced in Martin Schmid's papers, and on general RM solutions. Loves reading scientific papers. Does focus-meditation to train ability to deep-work in isolation. Is good at prioritization, doesn't get tempted into starting with tasks that look easy. Embrasses #link("https://youtu.be/YC4T3g7QP5w?si=QkNuh2Sb1KKh0l-Q")[contradiction].
+world-class at building accurate predictions; updates them fast and accurately when new relevant information comes out; which he systematically tracks for outstanding positions. PhD-level at math; has made academic contributions on ideas introduced in Martin Schmid's papers, and on general RM solutions. Loves reading scientific papers. Does focus-meditation to train ability to deep-work in isolation. Is good at prioritization, doesn't get tempted into starting with tasks that look easy. Embrasses #link("https://youtu.be/YC4T3g7QP5w?si=QkNuh2Sb1KKh0l-Q")[contradiction].
 ]
 
 casually swings deci-million positions; but very careful about the risk-management. Prefers to pyramid in when right; risking only existing profit whenever possible. Able to size the trades quickly and precisely, due to weekly playing poker at a high level.
@@ -30,7 +30,7 @@ casually swings deci-million positions; but very careful about the risk-manageme
 has automatic rm systems, removing the need to worry about psychology. Doesn't have to worry about slippage, as algorthims are in-place to regulate that. His quant hedge-fund Liquid Alpha employes 6 people, including 1 math PhD; with practically 0 churn, as #link("https://www.instagram.com/p/DRsoKzhETqG/")[he ensures that every employee can achieve his goals within the organization]. Is #link("https://youtu.be/KZSXFPt4Vqk")[mindful of entropy], - hiring only prospects above average level on the team.
 ]
 
-he is ruthlessly pain-seeking, only pursuing delayed gratification. Deep work is the most rewarding experience for him.
+he is ruthlessly pain-seeking, only pursuing delayed gratification. Deep work is the most rewarding experience for him, - religious #link("https://youtu.be/3uXYZwS_cck")[12h worker].
 
 == tangible
 #wrap(
