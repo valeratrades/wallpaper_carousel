@@ -30,7 +30,7 @@ casually swings deci-million positions; but very careful about the risk-manageme
 has automatic rm systems, removing the need to worry about psychology. Doesn't have to worry about slippage, as algorthims are in-place to regulate that. His quant hedge-fund Liquid Alpha employes 6 people, including 1 math PhD; with practically 0 churn, as #link("https://www.instagram.com/p/DRsoKzhETqG/")[he ensures that every employee can achieve his goals within the organization]. Is #link("https://youtu.be/KZSXFPt4Vqk")[mindful of entropy], - hiring only prospects above average level on the team.
 ]
 
-he is ruthlessly pain-seeking, only pursuing delayed gratification. Deep work is the most rewarding experience for him, - religious #link("https://youtu.be/3uXYZwS_cck")[12h worker]. Forever cogniscent of the need to pay down ignorance debt. /*literal cost of you not knowing how to make millions right now is the difference between where you are and where you could be*/
+he is ruthlessly pain-seeking, only pursuing delayed gratification. Deep work is the most rewarding experience for him, - religious #link("https://youtu.be/3uXYZwS_cck")[12h worker]. Forever cogniscent of the need to pay down ignorance debt/*literal cost of you not knowing how to make millions right now is the difference between where you are and where you could be*/. Obsessed with finishing things /*TODO: add yt link to Sam or Charlie*/. Delegates ruthlessly; being aware of #link("https://youtu.be/xm2cA5Y5Ru4")[comparative activity hourly rates]. Optimizes environment to minimize necessary decision making to stupid extent /*TODO: add yt vid link to Sam or Charlie*/.
 
 == tangible
 #wrap(

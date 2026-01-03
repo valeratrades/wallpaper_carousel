@@ -16,7 +16,10 @@
 
     { text = ''if it's not a "hell yes",\nit's a "no"''; author = "Derek Sivers"; }
 
-    { text = ''your "best" is not good enough\nDo what is required.''; author = "Alex Hormozi"; }
+    { text = ''your "best" is not good enough
+    Do what is required.''; author = "Alex Hormozi"; }
+
+    { text = "what would make a more epic story?"; author = "Alex Hormozi"; }
   ];
   balance = {
     command = "discretionary_engine risk balance";

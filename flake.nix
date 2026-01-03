@@ -4,7 +4,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks.url = "github:cachix/git-hooks.nix";
-    v-utils.url = "github:valeratrades/.github/v1.2.1";
+    v-utils.url = "github:valeratrades/.github?ref=v1.4";
     wrap-it = {
       url = "github:valeratrades/wrap-it/cf3de8ced50c353ccfd534f3bb1ae9f6d5a04788";
       flake = false;
@@ -33,9 +33,7 @@
             inherit pkgs pname;
             langs = [ "rs" ];
             lastSupportedVersion = "nightly-2025-11-18";
-            jobsErrors = [ "rust-tests" ];
-            jobsWarnings = [ "rust-doc" "rust-clippy" "rust-machete" "rust-sorted" "rust-sorted-derives" "tokei" ];
-            jobsOther = [ "loc-badge" ];
+            jobs.default = true;
           };
           readme = v-utils.readme-fw {
             inherit pkgs pname;
