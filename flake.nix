@@ -4,7 +4,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks.url = "github:cachix/git-hooks.nix";
-    v-utils.url = "github:valeratrades/.github?ref=v1.4";
+    v-utils.url = "github:valeratrades/.github";
     wrap-it = {
       url = "github:valeratrades/wrap-it/cf3de8ced50c353ccfd534f3bb1ae9f6d5a04788";
       flake = false;
@@ -39,7 +39,7 @@
             inherit pkgs pname;
             lastSupportedVersion = "nightly-1.93";
             rootDir = ./.;
-            licenses = [{ name = "Blue Oak 1.0.0"; outPath = "LICENSE"; }];
+            licenses = [{ license = v-utils.files.licenses.nsfw; }];
             badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ];
           };
         in
@@ -126,9 +126,8 @@
               shellHook =
                 pre-commit-check.shellHook
                 + github.shellHook
+                + readme.shellHook
                 + ''
-                  cp -f ${v-utils.files.licenses.blue_oak} ./LICENSE
-
                   cp -f ${(v-utils.files.treefmt) { inherit pkgs; }} ./.treefmt.toml
 
                   mkdir -p ./.cargo
@@ -136,13 +135,12 @@
                   cp -f ${(v-utils.files.rust.config { inherit pkgs; })} ./.cargo/config.toml
                   cp -f ${(v-utils.files.rust.rustfmt { inherit pkgs; })} ./.rustfmt.toml
 
-                  cp -f ${readme} ./README.md
-
                   mkdir -p ./assets
                   cp -f ${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSansMono.ttf ./assets/DejaVuSansMono.ttf
 
                   alias qr="./target/debug/${pname}"
-                '';
+                ''
+                + (v-utils.utils.checkShellHooks { inherit github readme; });
 
               packages = [
                 mold-wrapped

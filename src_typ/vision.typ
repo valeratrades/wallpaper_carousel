@@ -97,3 +97,4 @@ for each of these, imagine a picture where the statement is true, and you have a
 == habits to establish
 - note down distractions (that successfully diverted your attention away from work)
 - prioritize hardest task in todo lists // currently don't do any prioritization once a list is constructed, - just going off of what feels right. And what feels right is what is easy atm. So I end up working on often much less relevant stuff.
+- reinforce horrid fear of not succeeding. You must have a fully formed picture of exactly where you will be; same as what you are running from. I would rather die than become like those pathetic loosers.

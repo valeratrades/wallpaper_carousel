@@ -14,12 +14,15 @@
 
     "all male problems can be\nsolved with more money"
 
-    { text = ''if it's not a "hell yes",\nit's a "no"''; author = "Derek Sivers"; }
+    { text = ''if it's not a "hell yes",
+    it's a "no"''; author = "Derek Sivers"; }
 
     { text = ''your "best" is not good enough
     Do what is required.''; author = "Alex Hormozi"; }
 
     { text = "what would make a more epic story?"; author = "Alex Hormozi"; }
+
+    { text = "make the boat go faster.\nIgnore the rest"; author = "Sam Ovens"; }
   ];
   balance = {
     command = "discretionary_engine risk balance";
