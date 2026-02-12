@@ -4,7 +4,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks.url = "github:cachix/git-hooks.nix";
-    v-utils.url = "github:valeratrades/.github";
+    v-utils.url = "github:valeratrades/.github?ref=v1.4";
     wrap-it = {
       url = "github:valeratrades/wrap-it/cf3de8ced50c353ccfd534f3bb1ae9f6d5a04788";
       flake = false;
@@ -29,6 +29,9 @@
           pname = manifest.name;
           stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
 
+          rs = v-utils.rs {
+            inherit pkgs rust;
+          };
           github = v-utils.github {
             inherit pkgs pname;
             langs = [ "rs" ];
@@ -42,6 +45,7 @@
             licenses = [{ license = v-utils.files.licenses.nsfw; }];
             badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ];
           };
+          combined = v-utils.utils.combine [ readme github rs ];
         in
         {
           packages =
@@ -125,22 +129,12 @@
               inherit stdenv;
               shellHook =
                 pre-commit-check.shellHook
-                + github.shellHook
-                + readme.shellHook
+                + combined.shellHook
                 + ''
-                  cp -f ${(v-utils.files.treefmt) { inherit pkgs; }} ./.treefmt.toml
-
-                  mkdir -p ./.cargo
-                  cp -f ${(v-utils.files.rust.clippy { inherit pkgs; })} ./.cargo/.clippy.toml
-                  cp -f ${(v-utils.files.rust.config { inherit pkgs; })} ./.cargo/config.toml
-                  cp -f ${(v-utils.files.rust.rustfmt { inherit pkgs; })} ./.rustfmt.toml
-
                   mkdir -p ./assets
                   cp -f ${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSansMono.ttf ./assets/DejaVuSansMono.ttf
-
-                  alias qr="./target/debug/${pname}"
                 ''
-                + (v-utils.utils.checkShellHooks { inherit github readme; });
+              ;
 
               packages = [
                 mold-wrapped
@@ -148,7 +142,7 @@
                 pkg-config
                 rust
                 dejavu_fonts
-              ] ++ pre-commit-check.enabledPackages ++ github.enabledPackages;
+              ] ++ pre-commit-check.enabledPackages ++ combined.enabledPackages;
 
               env.RUST_BACKTRACE = 1;
               env.RUST_LIB_BACKTRACE = 0;

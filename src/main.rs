@@ -15,6 +15,10 @@ use tracing::{info, warn};
 use v_utils::utils::eyre::exit_on_error;
 use wallpaper_carousel::config::{AppConfig, SettingsFlags};
 
+fn main() {
+	v_utils::clientside!();
+	exit_on_error(run());
+}
 #[derive(Debug, Parser)]
 #[command(name = "wallpaper_carousel")]
 #[command(about = "Extend wallpaper with citation overlays")]
@@ -378,11 +382,6 @@ fn load_last_input() -> Result<PathBuf> {
 	Ok(PathBuf::from(content.trim()))
 }
 
-fn main() {
-	v_utils::clientside!();
-	exit_on_error(run());
-}
-
 fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
 	info!("Starting wallpaper generation for: {}", input_path.display());
 
@@ -397,7 +396,7 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
 			Ok(value) =>
 				if let Some(label) = &balance.label {
 					v_utils::elog!("{}:\n{}", label, value);
-					Some(format!("{}\n{}", label, value))
+					Some(format!("{label}\n{value}"))
 				} else {
 					v_utils::elog!("{}", value);
 					Some(value)
@@ -467,7 +466,7 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
 }
 
 fn handle_next_command(backwards: bool, random: bool, directory: Option<PathBuf>) -> Result<()> {
-	info!("Circle command: backwards={}, random={}, directory={:?}", backwards, random, directory);
+	info!("Circle command: backwards={backwards}, random={random}, directory={directory:?}");
 
 	// Load the current image path
 	let current_path = load_last_input()?;
@@ -717,9 +716,9 @@ fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, wi
 		.enumerate()
 		.map(|(i, line)| {
 			if i == 0 {
-				format!(r#"<tspan x="{}" dy="0">{}</tspan>"#, quote_x, line)
+				format!(r#"<tspan x="{quote_x}" dy="0">{line}</tspan>"#)
 			} else {
-				format!(r#"<tspan x="{}" dy="1.2em">{}</tspan>"#, quote_x, line)
+				format!(r#"<tspan x="{quote_x}" dy="1.2em">{line}</tspan>"#)
 			}
 		})
 		.collect::<Vec<_>>()
@@ -741,12 +740,12 @@ fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, wi
 			.replace('\'', "&apos;");
 
 		// Calculate author text width
-		let author_text = format!("© {}", escaped_author);
+		let author_text = format!("© {escaped_author}");
 
 		// Position author at the same right edge as the quote (right-aligned with text-anchor: end)
 		let author_x = quote_right_edge;
 		let author_height = 21;
-		(format!(r#"<text class="author" x="{}" y="{}">{}</text>"#, author_x, author_y, author_text), author_height)
+		(format!(r#"<text class="author" x="{author_x}" y="{author_y}">{author_text}</text>"#), author_height)
 	} else {
 		(String::new(), 0)
 	};
@@ -784,19 +783,18 @@ fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, wi
 			.enumerate()
 			.map(|(i, line)| {
 				if i == 0 {
-					format!(r#"<tspan x="{}" dy="0">{}</tspan>"#, balance_x, line)
+					format!(r#"<tspan x="{balance_x}" dy="0">{line}</tspan>"#)
 				} else {
-					format!(r#"<tspan x="{}" dy="1.2em">{}</tspan>"#, balance_x, line)
+					format!(r#"<tspan x="{balance_x}" dy="1.2em">{line}</tspan>"#)
 				}
 			})
 			.collect::<Vec<_>>()
 			.join("\n      ");
 
 		format!(
-			r#"<text class="balance" x="{}" y="{}">
-      {}
-  </text>"#,
-			balance_x, balance_y, balance_tspans
+			r#"<text class="balance" x="{balance_x}" y="{balance_y}">
+      {balance_tspans}
+  </text>"#
 		)
 	} else {
 		String::new()
@@ -827,13 +825,12 @@ fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, wi
       }}
     </style>
   </defs>
-  <text class="quote" x="{}" y="{}">
-      {}
+  <text class="quote" x="{quote_x}" y="{quote_y}">
+      {quote_tspans}
   </text>
   {author_element}
   {balance_element}
 </svg>"#,
-		quote_x, quote_y, quote_tspans,
 	);
 
 	Ok(svg)
@@ -855,7 +852,8 @@ fn composite_text_on_image(params: &CompositeParams) -> Result<()> {
 	if let Some(path) = dev_font_path
 		&& path.exists()
 	{
-		let _ = fontdb.load_font_file(&path); // Ignore errors, system fonts are already loaded
+		let e = fontdb.load_font_file(&path);
+		warn!(?e) // Ignore errors, - means system fonts are already loaded
 	}
 
 	let options = usvg::Options {

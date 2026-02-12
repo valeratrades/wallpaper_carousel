@@ -19,7 +19,7 @@ target Valeriy Sakharov is a trader worth 25M\$
 #wrap(
   image("./assets/MartinSchmid.jpg", width: 30%),
 )[
-world-class at building accurate predictions; updates them fast and accurately when new relevant information comes out; which he systematically tracks for outstanding positions. PhD-level at math; has made academic contributions on ideas introduced in Martin Schmid's papers, and on general RM solutions. Loves reading scientific papers. Does focus-meditation to train ability to deep-work in isolation. Is good at prioritization, doesn't get tempted into starting with tasks that look easy. Embrasses #link("https://youtu.be/YC4T3g7QP5w?si=QkNuh2Sb1KKh0l-Q")[contradiction].
+world-class at building accurate predictions; updates them fast and accurately when new relevant information comes out; which he systematically tracks for outstanding positions. PhD-level at math; has made academic contributions on ideas introduced in Martin Schmid's papers, and on general RM solutions. Loves reading scientific papers. Does focus-meditation to train ability to deep-work in isolation. Is good at prioritization, doesn't get tempted into starting with tasks that look easy. Embrasses #link("https://youtu.be/YC4T3g7QP5w?si=QkNuh2Sb1KKh0l-Q")[contradiction]. Greedily #link("https://youtu.be/6BQ3whjWG3M?t=24m23s")[collects compacted expertise] from absolutely everyone ahead of me in my field on any axis; readily overpaying multiples of favor-units to get in return application of their experience, Hormozi-style.
 ]
 
 casually swings deci-million positions; but very careful about the risk-management. Prefers to pyramid in when right; risking only existing profit whenever possible. Able to size the trades quickly and precisely, due to weekly playing poker at a high level.
@@ -98,3 +98,4 @@ for each of these, imagine a picture where the statement is true, and you have a
 - note down distractions (that successfully diverted your attention away from work)
 - prioritize hardest task in todo lists // currently don't do any prioritization once a list is constructed, - just going off of what feels right. And what feels right is what is easy atm. So I end up working on often much less relevant stuff.
 - reinforce horrid fear of not succeeding. You must have a fully formed picture of exactly where you will be; same as what you are running from. I would rather die than become like those pathetic loosers.
+- $>= 10%$ monthly earnings _*must*_ be spent on education. In the beginning that will be paying people directly; later on more and more just the cost of running expirements.
