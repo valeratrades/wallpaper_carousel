@@ -15,10 +15,6 @@ use tracing::{info, warn};
 use v_utils::utils::eyre::exit_on_error;
 use wallpaper_carousel::config::{AppConfig, SettingsFlags};
 
-fn main() {
-	v_utils::clientside!();
-	exit_on_error(run());
-}
 #[derive(Debug, Parser)]
 #[command(name = "wallpaper_carousel")]
 #[command(about = "Extend wallpaper with citation overlays")]
@@ -28,7 +24,6 @@ struct Args {
 	#[command(flatten)]
 	settings: SettingsFlags,
 }
-
 #[derive(Debug, Parser)]
 enum Command {
 	/// Extend an image with text overlays and set as wallpaper
@@ -57,6 +52,10 @@ enum Command {
 		/// Optional directory to use instead of the parent of last input
 		directory: Option<PathBuf>,
 	},
+}
+fn main() {
+	v_utils::clientside!();
+	exit_on_error(run());
 }
 
 #[derive(Debug, Deserialize)]

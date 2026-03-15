@@ -30,7 +30,17 @@
 
     "work env is not getting better.\nIf you can't work at 100% now,\nyou will never make it"
 
+    "omnipotence is measured by how quickly\nthings you imagine can happen"
+
+    "math -> code -> trade -> sleep; repeat"
+
+    "knowing math is akin to having\nx-ray glasses for logical rels"
+
     "momento mori"
+
+    "what is measured\ngets improved"
+
+    "slack don't skip"
 
     { text = ''
 󿾴󷛮󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󳵐󻡪
