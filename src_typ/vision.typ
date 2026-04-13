@@ -22,7 +22,7 @@ target Valeriy Sakharov is a trader worth 25M\$
 world-class at building accurate predictions; updates them fast and accurately when new relevant information comes out; which he systematically tracks for outstanding positions. PhD-level at math; has made academic contributions on ideas introduced in Martin Schmid's papers, and on general RM solutions. Loves reading scientific papers. Does focus-meditation to train ability to deep-work in isolation. Is good at prioritization, doesn't get tempted into starting with tasks that look easy. Embrasses #link("https://youtu.be/YC4T3g7QP5w?si=QkNuh2Sb1KKh0l-Q")[contradiction]. Greedily #link("https://youtu.be/6BQ3whjWG3M?t=24m23s")[collects compacted expertise] from absolutely everyone ahead of me in my field on any axis; readily overpaying multiples of favor-units to get in return application of their experience, Hormozi-style. Conscious of the #link("https://www.youtube.com/watch?v=UUiMaSbr79w"))[identity cycle] and knows how to detect being at the upper boundary; pull force of the undesirable identity; tools to overpower it.
 ]
 
-casually swings deci-million positions; but very careful about the risk-management. Prefers to pyramid in when right; risking only existing profit whenever possible. Able to size the trades quickly and precisely, due to weekly playing poker at a high level. Treats his company like a war, enjoys biographies of great conquerers, #link("https://youtu.be/7Y7Yxf67g7Q?si=2b9sJ4H8QHxqar6y")[like Musk and Napoleon has organization split into Core Units and fights on the frontlines].
+casually swings deci-million positions; but very careful about the risk-management. Prefers to pyramid in when right; risking only existing profit whenever possible. Able to size the trades quickly and precisely, due to weekly playing poker at a high level. Treats his company like a war, enjoys biographies of great conquerers, #link("https://youtu.be/7Y7Yxf67g7Q?si=2b9sJ4H8QHxqar6y")[like Musk and Napoleon has organization split into Core Units and fights on the frontlines]. And once a direction is planned and chosen, there is no deliberation, - I switch to 100% execution, 0 deliberation; #link("https://youtu.be/LNdsl52emwQ?t=202")[like Rockerfeller did].
 
 #wrap(
   image("./assets/sbf_desk.png", width: 40%),
@@ -50,7 +50,8 @@ he is ruthlessly pain-seeking, only pursuing delayed gratification. Deep work is
 ]
   Goes there for 1-2 weeks yearly; planning the life for the next year, in semi-seclusion
 - owns a 10k Rolex, but prefers wearing Casio over it
-
+- doesn't have a wake-up alarm
+  // I think it's important to drive this as one of the invariants, as [you can't self-diagnose sleep debt](https://x.com/aakashgupta/status/2042720283447247121) /*[The Cumulative Cost of additional Wakefulness](https://academic.oup.com/sleep/article-abstract/26/2/117/2709164?redirectedFrom=fulltext&login=false#no-access-message)*/
 
 == fitness
 can do all of:

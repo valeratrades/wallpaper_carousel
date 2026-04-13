@@ -1,4 +1,5 @@
 {
+  # think of these as reminders. There shouldn't be anything new or randomly generated here. Quality control, - me seing any of the quotes here must make me recall some good practice.
   quotes = [
     { text = "EV compounds,\nembarrassment doesn't"; author = "Beny"; }
 
@@ -33,6 +34,8 @@
     "omnipotence is measured by how quickly\nthings you imagine can happen"
 
     "math -> code -> trade -> sleep; repeat"
+
+    "do not risk new addictions"
 
     "knowing math is akin to having\nx-ray glasses for logical rels"
 

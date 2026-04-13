@@ -846,6 +846,17 @@ fn composite_text_on_image(params: &CompositeParams) -> Result<()> {
 	let mut fontdb = fontdb::Database::new();
 	fontdb.load_system_fonts();
 
+	// fontdb's fontconfig parser doesn't iterate XDG_DATA_DIRS for font directories like the C fontconfig does,
+	// so we load them manually to pick up home-manager fonts and other XDG-registered fonts.
+	if let Ok(xdg_data_dirs) = std::env::var("XDG_DATA_DIRS") {
+		for dir in xdg_data_dirs.split(':') {
+			let fonts_dir = Path::new(dir).join("fonts");
+			if fonts_dir.is_dir() {
+				fontdb.load_fonts_dir(fonts_dir);
+			}
+		}
+	}
+
 	// Try to load DejaVu Sans Mono from common locations (for dev environment)
 	let dev_font_path = std::env::current_dir().ok().map(|p| p.join("assets/DejaVuSansMono.ttf"));
 	if let Some(path) = dev_font_path
