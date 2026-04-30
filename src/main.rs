@@ -1,6 +1,7 @@
 use std::{
 	path::{Path, PathBuf},
 	process::Command as ProcessCommand,
+	sync::Arc,
 };
 
 use clap::Parser;
@@ -323,7 +324,13 @@ fn check_and_handle_lock() -> Result<()> {
 	if lock_path.exists() {
 		// Read PID from lock file
 		let pid_str = std::fs::read_to_string(&lock_path)?;
-		let pid: i32 = pid_str.trim().parse().context("Invalid PID in lock file")?;
+		let pid_str = pid_str.trim();
+		if pid_str.is_empty() {
+			// Stale/corrupt lock file with no PID — just remove it
+			std::fs::remove_file(&lock_path)?;
+			return Ok(());
+		}
+		let pid: i32 = pid_str.parse().context("Invalid PID in lock file")?;
 
 		// Try to kill the process
 		v_utils::elog!("Found existing process (PID: {}), killing it...", pid);
@@ -867,7 +874,7 @@ fn composite_text_on_image(params: &CompositeParams) -> Result<()> {
 	}
 
 	let options = usvg::Options {
-		fontdb: std::sync::Arc::new(fontdb),
+		fontdb: Arc::new(fontdb),
 		..Default::default()
 	};
 
