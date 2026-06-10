@@ -100,3 +100,4 @@ for each of these, imagine a picture where the statement is true, and you have a
 - prioritize hardest task in todo lists // currently don't do any prioritization once a list is constructed, - just going off of what feels right. And what feels right is what is easy atm. So I end up working on often much less relevant stuff.
 - reinforce horrid fear of not succeeding. You must have a fully formed picture of exactly where you will be; same as what you are running from. I would rather die than become like those pathetic loosers.
 - $>= 10%$ monthly earnings _*must*_ be spent on education. In the beginning that will be paying people directly; later on more and more just the cost of running expirements.
+- every inconducive emotion preventing me from making a necessary action, triggers #link("https://youtu.be/33zWDyEHqM4?t=3041&si=2mZl_xPyRakC6zll")[DISARM protocol], and then gets logged to the journal postfactum.

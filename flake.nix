@@ -100,15 +100,6 @@
                 postInstall = ''
                   mkdir -p $out/share/fonts
                   ln -s ${pkgs.dejavu_fonts}/share/fonts/truetype $out/share/fonts/truetype
-
-                  # Include vision document (pre-built output)
-                  mkdir -p $out/share/vision
-                  cp ${visionDocument}/output.png $out/share/vision/vision.png
-                  cp ${visionDocument}/output.pdf $out/share/vision/vision.pdf
-
-                  # Include vision source for runtime regeneration
-                  mkdir -p $out/share/vision/src_typ
-                  cp -r ${./src_typ}/* $out/share/vision/src_typ/
                 '';
 
                 # Set FONTCONFIG_PATH to include our fonts
