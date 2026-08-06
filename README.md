@@ -7,8 +7,8 @@
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs&style=flat-square" height="20">](https://docs.rs/wallpaper_carousel)
 ![Lines Of Code](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/valeratrades/b48e6f02c61942200e7d1e3eeabf9bcb/raw/wallpaper_carousel-loc.json)
 <br>
-[<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/valeratrades/wallpaper_carousel/errors.yml?branch=master&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/valeratrades/wallpaper_carousel/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
-[<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/valeratrades/wallpaper_carousel/warnings.yml?branch=master&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/valeratrades/wallpaper_carousel/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
+[<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/valeratrades/wallpaper_carousel/errors.yml?branch=main&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/valeratrades/wallpaper_carousel/actions?query=branch%3Amain) <!--NB: Won't find it if repo is private-->
+[<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/valeratrades/wallpaper_carousel/warnings.yml?branch=main&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/valeratrades/wallpaper_carousel/actions?query=branch%3Amain) <!--NB: Won't find it if repo is private-->
 
 extend wallpaper with some random things I care about. Not generalizable in the slightest, only intended to be used by me myself exclusively.
 
@@ -18,6 +18,19 @@ Following [Charlie Morgan](https://youtu.be/IUxn7vT104Y?si=xXYJEDzycHf0l8Lu), de
 Most importantly, should be actively used for decision-making. What would the target version of myself do? If answer is known, - must follow it. The more difficult to follow, the better, - means that's likely the discrepancy.
 
 The `generate` command uses the bundled vision document (in `src_typ/`) as the wallpaper, and will regenerate it from source if the typst files are newer than the output.
+<!-- markdownlint-disable -->
+<details>
+<summary>
+<h2>Installation</h2>
+</summary>
+
+TODO
+
+</details>
+<!-- markdownlint-restore -->
+
+## Usage
+TODO
 
 # Other
 NB: note to self, - do not `git lfs` it, - nixos build won't be able to deref

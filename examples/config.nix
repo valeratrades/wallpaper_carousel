@@ -18,7 +18,7 @@
     { text = ''if it's not a "hell yes",
     it's a "no"''; author = "Derek Sivers"; }
 
-    { text = "maniacal sense of urgency\nis our operating principle"; author = "Elon Must";}
+    { text = "maniacal sense of urgency\nis our operating principle"; author = "Elon Musk";}
 
     { text = ''your "best" is not good enough
     Do what is required.''; author = "Alex Hormozi"; }
@@ -28,6 +28,14 @@
     { text = "make the boat go faster.\nIgnore the rest"; author = "Sam Ovens"; }
 
     { text = "it only makes sense to automate\nthat which is already done manually"; author = "Leily Hormozi"; }
+
+    {text = "you can lose a lot of money\nbut you must not lose a shred of reputation"; author = "Warren Buffet";}
+
+    {text = "battle of life is half-won\nby the young man who is brought personally\nin contact with high officials"; author = "Andrew Carnegie";}
+
+    {text = "invest in R&D when times are good\nM&A when there is blood"; author = "Andrew Carnegie (adapted)";}
+
+    {text = "you only need to get rich once"; author = "Charlie Munger";}
 
     "systems -> outputs\nImproving systems = winning"
 
@@ -47,91 +55,39 @@
 
     "slack don't skip"
 
-    "#1: never outshine the master"
+    "arrogance, to believe that resigning\nis worst threat you can make"
 
-    "#2: never put too much trust in friends,\nlearn how to use enemies"
+    "care more for the result\nthan anyone else"
 
-    "#3: conceal your intentions"
+    "I'm not fast enough"
 
-    "#4: always say less than necessary"
-
-    "#5: so much depends on reputation\n- guard it with your life"
-
-    "#6: court attention at all cost"
+    "#4: say less than necessary"
 
     "#7: get others to do the work for you,\nbut always take the credit"
 
-    "#8: make other people come to you\n- use bait if necessary"
-
     "#9: win through your actions,\nnever through argument"
 
-    "#10: infection:\navoid the unhappy and unlucky"
-
-    "#11: learn to keep people\ndependent on you"
+    "ruthlessly optimize\nthe social circle"
 
     "#12: use selective honesty and generosity\nto disarm your victim"
-
-    "#13: when asking for help,\nappeal to people's self-interest,\nnever to their mercy or gratitude"
-
-    "#14: pose as a friend,\nwork as a spy"
-
-    "#17: keep others in suspended terror:\ncultivate an air of unpredictability"
-
-    "#20: do not commit to anyone"
-
-    "#21: play a sucker to catch a sucker\n- seem dumber than your mark"
-
-    "#22: use the surrender tactic:\ntransform weakness into power"
-
-    "#23: concentrate your forces"
-
-    "#24: play the perfect courtier"
-
-    "#25: re-create yourself"
-
-    "#26: keep your hands clean"
-
-    "#27: play on people's need to believe\nto create a cultlike following"
 
     "#28: enter action with boldness"
 
     "#29: plan all the way to the end"
 
-    "#30: make your accomplishments\nseem effortless"
-
     "#31: control the options:\nget others to play with the cards you deal"
 
-    "#32: play to people's fantasies"
-
     "#33: discover each man's thumbscrew"
-
-    "#34: be royal in your own fashion:\nact like a king to be treated like one"
 
     "#35: master the art of timing"
 
     "#36: disdain things you cannot have:\nignoring them is the best revenge"
 
-    "#37: create compelling spectacles"
-
-    "#38: think as you like\nbut behave like others"
-
     "#39: stir up waters to catch fish"
 
     "#40: despise the free lunch"
 
-    "#42: strike the shepherd\nand the sheep will scatter"
-
-    "#43: work on the hearts\nand minds of others"
-
-    "#44: disarm and infuriate\nwith the mirror effect"
-
-    "#45: preach the need for change,\nbut never reform too much at once"
-
     "#46: never appear too perfect"
-
-    "#47: do not go past the mark you aimed for;\nin victory, learn when to stop"
-
-    "#48: assume formlessness"
 
     { text = ''
 󿾴󷛮󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󳵐󻡪

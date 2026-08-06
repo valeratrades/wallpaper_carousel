@@ -1,55 +1,43 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
-    flake-utils.url = "github:numtide/flake-utils";
-    pre-commit-hooks.url = "github:cachix/git-hooks.nix";
-    pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
-    v-utils.url = "github:valeratrades/v_flakes?ref=v1.4";
-    v-utils.inputs.nixpkgs.follows = "nixpkgs";
-    v-utils.inputs.rust-overlay.follows = "rust-overlay";
+    v_flakes.url = "github:valeratrades/v_flakes?ref=v1.6";
     wrap-it = {
       url = "github:valeratrades/wrap-it/cf3de8ced50c353ccfd534f3bb1ae9f6d5a04788";
       flake = false;
     };
   };
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, v-utils, wrap-it }:
+  outputs = { self, v_flakes, wrap-it }:
+    let
+      inherit (v_flakes) flake-utils pre-commit-hooks;
+    in
     flake-utils.lib.eachDefaultSystem
       (
         system:
         let
-          overlays = [ (import rust-overlay) ];
-          pkgs = import nixpkgs {
-            inherit system overlays;
-            allowUnfree = true;
-          };
-          #NB: can't load rust-bin from nightly.latest, as there are week guarantees of which components will be available on each day.
-          rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
-            extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
-          });
-          pre-commit-check = pre-commit-hooks.lib.${system}.run (v-utils.files.preCommit { inherit pkgs; });
+          pkgs = import v_flakes.default_nixpkgs { inherit system; config.allowUnfree = true; };
+          rust = v_flakes.rs.default_nightly system;
+          pre-commit-check = pre-commit-hooks.lib.${system}.run (v_flakes.files.preCommit { inherit pkgs; });
           manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
           pname = manifest.name;
           stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
 
-          rs = v-utils.rs {
+          rs = v_flakes.rs {
             inherit pkgs rust;
           };
-          github = v-utils.github {
-            inherit pkgs pname;
-            langs = [ "rs" ];
-            lastSupportedVersion = "nightly-2025-11-18";
+          github = v_flakes.github {
+            inherit pkgs pname rs;
+            enable = true;
+            lastSupportedVersion = "nightly-2026-06-29";
             jobs.default = true;
           };
-          readme = v-utils.readme-fw {
+          readme = v_flakes.readme-fw {
             inherit pkgs pname;
             lastSupportedVersion = "nightly-1.93";
             rootDir = ./.;
-            licenses = [{ license = v-utils.files.licenses.nsfw; }];
+            licenses = [{ license = v_flakes.files.licenses.nsfw; }];
             badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ];
           };
-          combined = v-utils.utils.combine [ readme github rs ];
+          combined = v_flakes.utils.combine { inherit rust; modules = [ readme github rs ]; };
         in
         {
           packages =
@@ -132,7 +120,7 @@
               ;
 
               packages = [
-                mold-wrapped
+                mold
                 openssl
                 pkg-config
                 rust
