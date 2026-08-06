@@ -19,41 +19,45 @@ target Valeriy Sakharov is a trader worth 25M\$
 
 // ## Symptoms
 
-#wrap(
-  image("./assets/MartinSchmid.jpg", width: 30%),
-)[
-operating at the highest level means *making good decisions*. So he's world-class at building accurate predictions; updates them fast and accurately when new relevant information comes out; which he systematically tracks for outstanding positions. PhD-level at math; has made academic contributions on ideas introduced in Martin Schmid's papers, and on general RM solutions. Loves reading scientific papers. Does focus-meditation to train ability to deep-work in isolation. Is good at prioritization, doesn't get tempted into starting with tasks that look easy. Embrasses #link("https://youtu.be/YC4T3g7QP5w?si=QkNuh2Sb1KKh0l-Q")[contradiction]. Greedily #link("https://youtu.be/6BQ3whjWG3M?t=24m23s")[collects compacted expertise] from absolutely everyone ahead of me in my field on any axis; readily overpaying multiples of favor-units to get in return application of their experience, Hormozi-style. Conscious of the #link("https://www.youtube.com/watch?v=UUiMaSbr79w"))[identity cycle] and knows how to detect being at the upper boundary; pull force of the undesirable identity; tools to overpower it.
-]
-
-casually swings deci-million positions; but very careful about the risk-management. Prefers to pyramid in when right; risking only existing profit whenever possible. Able to size the trades quickly and precisely, due to weekly playing poker at a high level. Treats his company like a war, enjoys biographies of great conquerers, #link("https://youtu.be/7Y7Yxf67g7Q?si=2b9sJ4H8QHxqar6y")[like Musk and Napoleon has organization split into Core Units and fights on the frontlines]. And once a direction is planned and chosen, there is no deliberation, - I switch to 100% execution, 0 deliberation; #link("https://youtu.be/LNdsl52emwQ?t=202")[like Rockerfeller did].
 
 #wrap(
   image("./assets/sbf_desk.png", width: 40%),
 )[
-has automatic rm systems, removing the need to worry about psychology. Doesn't have to worry about slippage, as algorthims are in-place to regulate that. His quant hedge-fund Liquid Alpha employes 6 people, including 1 math PhD; with practically 0 churn, as #link("https://www.instagram.com/p/DRsoKzhETqG/")[he ensures that every employee can achieve his goals within the organization]. Is #link("https://youtu.be/KZSXFPt4Vqk")[mindful of entropy], - hiring only prospects above average level on the team.
+casually swings deci-million positions; but very careful about the risk-management. Prefers to pyramid in when right; risking only existing profit whenever possible. Able to size the trades quickly and precisely, due to weekly playing poker at a high level.
+
+has automatic rm systems, removing the need to worry about psychology. Doesn't have to worry about slippage, as algorthims are in-place to regulate that. His quant hedge-fund Liquid Alpha employes 6 people (>50% are math PhD); with practically 0 churn, as #link("https://www.instagram.com/p/DRsoKzhETqG/")[he ensures that every employee can achieve his goals within the organization]. Is #link("https://youtu.be/KZSXFPt4Vqk")[mindful of entropy], - hiring only prospects above average level on the team.
 ]
 
 // ## Causes
-he is ruthlessly pain-seeking, only pursuing delayed gratification. Deep work is the most rewarding experience for him, - religious #link("https://youtu.be/3uXYZwS_cck")[12h worker]. Forever cogniscent of the need to pay down ignorance debt/*literal cost of you not knowing how to make millions right now is the difference between where you are and where you could be*/. #link("https://www.youtube.com/watch?v=CCtKq06wuH8&t=420s")[Obsessed with finishing things]. Delegates ruthlessly; being aware of #link("https://youtu.be/xm2cA5Y5Ru4")[comparative activity hourly rates]. Optimizes environment to minimize necessary decision making to stupid extent /*TODO: add yt vid link to Sam or Charlie*/. Pays close attention to distinguishing #link("https://youtu.be/sslfgLMOyWY?si=HzFsYqDTn4o9pAHf")[which activities are "weeds", and tearing them out]. Obsessed with speed, - has maniacal sence of urgency; disregards all arbitrary deadlines and pulls future forward. Plans through use of #link("https://youtu.be/N8aG6Nu3d9w?si=TEqfPthHdqG3vwh7")[cloning method]. Knows how to #link("/home/v/s/g/notes/action_sets/pre_work_env_with_easy_distractions.md")[snap himself into work] on demand.
+#wrap(
+  image("./assets/MartinSchmid.jpg", width: 30%),
+)[
+operating at the highest level means *making good decisions*. So he's world-class at building accurate predictions; updates them fast and accurately when new relevant information comes out; which he systematically tracks for outstanding positions. PhD-level at math; has made academic contributions on ideas introduced in Martin Schmid's papers, and on general RM solutions. Loves reading scientific papers. Embrasses #link("https://youtu.be/YC4T3g7QP5w?si=QkNuh2Sb1KKh0l-Q")[contradiction].
+]
+
+he is ruthlessly pain-seeking, only pursuing delayed gratification. Deep work is the most rewarding experience for him, - religious #link("https://youtu.be/3uXYZwS_cck")[12h worker]. Does focus-meditation to train ability to deep-work in isolation. Knows how to #link("/home/v/s/g/notes/action_sets/pre_work_env_with_easy_distractions.md")[snap himself into work] on demand. Optimizes environment to minimize necessary decision making to stupid extent /*TODO: add yt vid link to Sam or Charlie*/.
+
+is good at prioritization, doesn't get tempted into starting with tasks that look easy. Pays close attention to distinguishing #link("https://youtu.be/sslfgLMOyWY?si=HzFsYqDTn4o9pAHf")[which activities are "weeds", and tearing them out]. #link("https://www.youtube.com/watch?v=CCtKq06wuH8&t=420s")[Obsessed with finishing things]. Obsessed with speed, - has maniacal sence of urgency; disregards all arbitrary deadlines and pulls future forward. Plans through use of #link("https://youtu.be/N8aG6Nu3d9w?si=TEqfPthHdqG3vwh7")[cloning method].
+
+forever cogniscent of the need to pay down ignorance debt/*literal cost of you not knowing how to make millions right now is the difference between where you are and where you could be*/. Greedily #link("https://youtu.be/6BQ3whjWG3M?t=24m23s")[collects compacted expertise] from absolutely everyone ahead of me in my field on any axis; readily overpaying multiples of favor-units to get in return application of their experience, Hormozi-style. Conscious of the #link("https://www.youtube.com/watch?v=UUiMaSbr79w"))[identity cycle] and knows how to detect being at the upper boundary; pull force of the undesirable identity; tools to overpower it.
+
+delegates ruthlessly; being aware of #link("https://youtu.be/xm2cA5Y5Ru4")[comparative activity hourly rates]. Treats his company like a war, enjoys biographies of great conquerers, #link("https://youtu.be/7Y7Yxf67g7Q?si=2b9sJ4H8QHxqar6y")[like Musk and Napoleon has organization split into Core Units and fights on the frontlines]. And once a direction is planned and chosen, there is no deliberation, - I switch to 100% execution, 0 deliberation; #link("https://youtu.be/LNdsl52emwQ?t=202")[like Rockerfeller did].
 
 never sacrifices reputation, ruthless about defending it.
 
 == tangible
-#wrap(
-  image("./assets/Mercedez_S-class_Berline.png", width: 40%),
-)[
-- drives a Mercedes S-class
-] 
-#wrap(
-  image("./assets/apt_main.jpg", width: 40%),
-)[
-- lives in #link("https://moscowestates.com/property/apartment-110-sqm-on-the-56th-floor-in-the-federation-tower/")[Moscow City]
+#let tangible-pic(caption, path) = [
+  #box(width: 130pt, caption)
+  #image(path, height: 80pt)
 ]
-#wrap(
-  image("./assets/ski_slope_house.jpg", width: 40%),
-)[
-  - owns a house on a ski slope (\~1.4\$M) in Switzerland.
-]
+#grid(
+  columns: 3,
+  gutter: 15pt,
+  align: bottom,
+  tangible-pic([- drives a Mercedes S-class], "./assets/Mercedez_S-class_Berline.png"),
+  tangible-pic([- lives in #link("https://moscowestates.com/property/apartment-110-sqm-on-the-56th-floor-in-the-federation-tower/")[Moscow City]], "./assets/apt_main.jpg"),
+  tangible-pic([- owns a house on a ski slope (\~1.4\$M) in Switzerland.], "./assets/ski_slope_house.jpg"),
+)
   Goes there for 1-2 weeks yearly; planning the life for the next year, in semi-seclusion
 - owns a 10k Rolex, but prefers wearing Casio over it
 - doesn't have a wake-up alarm
