@@ -2,9 +2,13 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
+    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks.url = "github:cachix/git-hooks.nix";
+    pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
     v-utils.url = "github:valeratrades/v_flakes?ref=v1.4";
+    v-utils.inputs.nixpkgs.follows = "nixpkgs";
+    v-utils.inputs.rust-overlay.follows = "rust-overlay";
     wrap-it = {
       url = "github:valeratrades/wrap-it/cf3de8ced50c353ccfd534f3bb1ae9f6d5a04788";
       flake = false;
