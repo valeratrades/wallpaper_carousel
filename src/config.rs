@@ -16,7 +16,6 @@ pub struct AppConfig {
 	pub billionaires: bool,
 	pub text_padding: Option<u32>,
 	/// Path to the typst (`.typ`) document compiled into the generated wallpaper.
-	#[serde(default = "default_vision_source")]
 	pub vision_source: ExpandedPath,
 }
 
@@ -44,22 +43,6 @@ pub struct Quote {
 	pub text: String,
 	pub author: Option<String>,
 }
-fn default_vision_source() -> ExpandedPath {
-	ExpandedPath::from("./src_typ/vision.typ")
-}
-
-impl Default for AppConfig {
-	fn default() -> Self {
-		Self {
-			quotes: Vec::new(),
-			balance: None,
-			billionaires: false,
-			text_padding: Some(15),
-			vision_source: default_vision_source(),
-		}
-	}
-}
-
 impl<'de> Deserialize<'de> for Quote {
 	fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
 	where

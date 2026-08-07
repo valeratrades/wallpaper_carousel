@@ -614,6 +614,9 @@ fn get_display_resolution() -> Result<(u32, u32)> {
 
 fn get_all_active_displays() -> Result<Vec<(u32, u32)>> {
 	let output = ProcessCommand::new("swaymsg").args(["-t", "get_outputs"]).output()?;
+	if !output.status.success() {
+		bail!("swaymsg -t get_outputs failed:\n{}", String::from_utf8_lossy(&output.stderr));
+	}
 	let outputs: Vec<SwayOutput> = serde_json::from_slice(&output.stdout)?;
 	Ok(outputs.iter().filter_map(|o| o.current_mode.as_ref().map(|m| (m.width, m.height))).collect())
 }
