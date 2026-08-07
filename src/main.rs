@@ -1,3 +1,4 @@
+#![feature(duration_constructors)]
 use std::{
 	path::{Path, PathBuf},
 	process::Command as ProcessCommand,
@@ -16,6 +17,7 @@ use tracing::{info, warn};
 use v_utils::utils::eyre::exit_on_error;
 use wallpaper_carousel::config::{AppConfig, SettingsFlags};
 
+const BILLIONAIRE_CACHE_TTL: std::time::Duration = std::time::Duration::from_weeks(1);
 #[derive(Debug, Parser)]
 #[command(name = "wallpaper_carousel")]
 #[command(about = "Extend wallpaper with citation overlays")]
@@ -104,6 +106,14 @@ struct ForbesPersonList {
 
 /// Forbes' real-time list reports its total in `count`, so we ask for a single entry and read that.
 fn billionaire_count() -> Result<u32> {
+	let cache_path = v_utils::xdg_cache_file!("billionaires.txt");
+	if cache_path.exists() {
+		let age = cache_path.metadata()?.modified()?.elapsed()?;
+		if age < BILLIONAIRE_CACHE_TTL {
+			return Ok(std::fs::read_to_string(&cache_path)?.trim().parse()?);
+		}
+	}
+
 	let output = ProcessCommand::new("curl")
 		.args([
 			"-sS",
@@ -122,6 +132,8 @@ fn billionaire_count() -> Result<u32> {
 
 	let rtb: ForbesRtb = serde_json::from_slice(&output.stdout).wrap_err("Forbes real-time list schema changed")?;
 	ensure!(rtb.person_list.count > 0, "Forbes returned 0 billionaires");
+
+	std::fs::write(&cache_path, rtb.person_list.count.to_string())?;
 	Ok(rtb.person_list.count)
 }
 
