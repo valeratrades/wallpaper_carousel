@@ -11,6 +11,9 @@ use v_utils::{
 pub struct AppConfig {
 	pub quotes: Vec<Quote>,
 	pub balance: Option<Balance>,
+	/// Render today's count of billionaires worldwide, fetched from Forbes' real-time list.
+	#[serde(default)]
+	pub billionaires: bool,
 	pub text_padding: Option<u32>,
 	/// Path to the typst (`.typ`) document compiled into the generated wallpaper.
 	#[serde(default = "default_vision_source")]
@@ -50,6 +53,7 @@ impl Default for AppConfig {
 		Self {
 			quotes: Vec::new(),
 			balance: None,
+			billionaires: false,
 			text_padding: Some(15),
 			vision_source: default_vision_source(),
 		}

@@ -7,7 +7,7 @@ use std::{
 use clap::Parser;
 use color_eyre::{
 	Result,
-	eyre::{Context, ContextCompat, bail},
+	eyre::{Context, ContextCompat, bail, ensure},
 };
 use image::GenericImageView;
 use rand::prelude::IndexedRandom;
@@ -84,11 +84,45 @@ struct CompositeParams<'a> {
 	output_path: &'a Path,
 	text: &'a str,
 	author: Option<&'a str>,
-	balance: Option<&'a str>,
+	stats: Option<&'a str>,
 	width: u32,
 	height: u32,
 	safe_area: &'a SafeArea,
 	text_padding: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ForbesRtb {
+	#[serde(rename = "personList")]
+	person_list: ForbesPersonList,
+}
+
+#[derive(Debug, Deserialize)]
+struct ForbesPersonList {
+	count: u32,
+}
+
+/// Forbes' real-time list reports its total in `count`, so we ask for a single entry and read that.
+fn billionaire_count() -> Result<u32> {
+	let output = ProcessCommand::new("curl")
+		.args([
+			"-sS",
+			"--max-time",
+			"15",
+			"-A",
+			"Mozilla/5.0",
+			"https://www.forbes.com/forbesapi/person/rtb/0/position/true.json?fields=personName&limit=1",
+		])
+		.output()
+		.wrap_err("Failed to run curl")?;
+
+	if !output.status.success() {
+		bail!("curl failed: {}", String::from_utf8_lossy(&output.stderr));
+	}
+
+	let rtb: ForbesRtb = serde_json::from_slice(&output.stdout).wrap_err("Forbes real-time list schema changed")?;
+	ensure!(rtb.person_list.count > 0, "Forbes returned 0 billionaires");
+	Ok(rtb.person_list.count)
 }
 
 fn get_cache_file_path() -> PathBuf {
@@ -348,25 +382,31 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
 	v_utils::elog!("Selected quote: {:?}", quote.text);
 	v_utils::elog!("Author: {:?}", quote.author);
 
-	// Get balance value if configured
-	let balance_text = if let Some(balance) = &config.balance {
+	let mut stats: Vec<String> = Vec::new();
+
+	if let Some(balance) = &config.balance {
 		match balance.get_value() {
-			Ok(value) =>
-				if let Some(label) = &balance.label {
+			Ok(value) => match &balance.label {
+				Some(label) => {
 					v_utils::elog!("{}:\n{}", label, value);
-					Some(format!("{label}\n{value}"))
-				} else {
+					stats.push(format!("{label}\n{value}"));
+				}
+				None => {
 					v_utils::elog!("{}", value);
-					Some(value)
-				},
-			Err(e) => {
-				warn!("Balance command failed: {e}");
-				None
-			}
+					stats.push(value);
+				}
+			},
+			Err(e) => warn!("Balance command failed: {e}"),
 		}
-	} else {
-		None
-	};
+	}
+
+	if config.billionaires {
+		let count = billionaire_count()?;
+		v_utils::elog!("{count} billionaires");
+		stats.push(format!("{count} billionaires"));
+	}
+
+	let stats_text = (!stats.is_empty()).then(|| stats.join("\n"));
 
 	v_utils::log!("Generating CSS...");
 
@@ -406,7 +446,7 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
 		output_path: &output_path,
 		text: &quote.text,
 		author: quote.author.as_deref(),
-		balance: balance_text.as_deref(),
+		stats: stats_text.as_deref(),
 		width: img_width,
 		height: img_height,
 		safe_area: &safe_area,
@@ -643,7 +683,7 @@ fn resize_fill(img: image::DynamicImage, target_width: u32, target_height: u32) 
 	DynamicImage::ImageRgba8(imageops::crop_imm(&resized.to_rgba8(), x_offset, y_offset, target_width, target_height).to_image())
 }
 
-fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, width: u32, height: u32, safe_area: &SafeArea, text_padding: u32) -> Result<String> {
+fn generate_text_svg(text: &str, author: Option<&str>, stats: Option<&str>, width: u32, height: u32, safe_area: &SafeArea, text_padding: u32) -> Result<String> {
 	// Nested padding levels: [level0, level1, level2, level3, level4]
 	// Each level is half of the previous
 	let padding_levels: [u32; 5] = [text_padding, text_padding / 2, text_padding / 4, text_padding / 8, text_padding / 16];
@@ -716,42 +756,41 @@ fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, wi
 		quote_y + quote_height + padding_levels[0]
 	};
 
-	let balance_element = if let Some(balance) = balance {
-		let escaped_balance = balance
+	let stats_element = if let Some(stats) = stats {
+		let escaped_stats = stats
 			.replace('&', "&amp;")
 			.replace('<', "&lt;")
 			.replace('>', "&gt;")
 			.replace('"', "&quot;")
 			.replace('\'', "&apos;");
 
-		// Calculate balance text width
-		let balance_font_size = 20;
-		let char_width_balance = (balance_font_size as f32 * 0.6) as u32;
-		let balance_lines: Vec<&str> = escaped_balance.lines().collect();
-		let max_balance_line_len = balance_lines.iter().map(|l| l.len()).max().unwrap_or(0);
-		let balance_text_width = max_balance_line_len as u32 * char_width_balance;
+		let stats_font_size = 20;
+		let char_width_stats = (stats_font_size as f32 * 0.6) as u32;
+		let stats_lines: Vec<&str> = escaped_stats.lines().collect();
+		let max_stats_line_len = stats_lines.iter().map(|l| l.len()).max().unwrap_or(0);
+		let stats_text_width = max_stats_line_len as u32 * char_width_stats;
 
-		// Position balance right below the quote component (level 0 padding from right edge)
-		let balance_x = safe_area.x + safe_area.width - padding_levels[0] - balance_text_width;
-		let balance_y = quote_bottom_y;
+		// Position stats right below the quote component (level 0 padding from right edge)
+		let stats_x = safe_area.x + safe_area.width - padding_levels[0] - stats_text_width;
+		let stats_y = quote_bottom_y;
 
 		// Create tspan elements
-		let balance_tspans: String = balance_lines
+		let stats_tspans: String = stats_lines
 			.iter()
 			.enumerate()
 			.map(|(i, line)| {
 				if i == 0 {
-					format!(r#"<tspan x="{balance_x}" dy="0">{line}</tspan>"#)
+					format!(r#"<tspan x="{stats_x}" dy="0">{line}</tspan>"#)
 				} else {
-					format!(r#"<tspan x="{balance_x}" dy="1.2em">{line}</tspan>"#)
+					format!(r#"<tspan x="{stats_x}" dy="1.2em">{line}</tspan>"#)
 				}
 			})
 			.collect::<Vec<_>>()
 			.join("\n      ");
 
 		format!(
-			r#"<text class="balance" x="{balance_x}" y="{balance_y}">
-      {balance_tspans}
+			r#"<text class="stats" x="{stats_x}" y="{stats_y}">
+      {stats_tspans}
   </text>"#
 		)
 	} else {
@@ -775,7 +814,7 @@ fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, wi
         fill: white;
         text-anchor: end;
       }}
-      .balance {{
+      .stats {{
         font-family: 'DejaVu Sans Mono';
         font-size: 20px;
         fill: white;
@@ -787,7 +826,7 @@ fn generate_text_svg(text: &str, author: Option<&str>, balance: Option<&str>, wi
       {quote_tspans}
   </text>
   {author_element}
-  {balance_element}
+  {stats_element}
 </svg>"#,
 	);
 
@@ -799,7 +838,7 @@ fn composite_text_on_image(params: &CompositeParams) -> Result<()> {
 	let mut bg_image = image::open(params.bg_image_path)?.to_rgba8();
 
 	// Generate SVG with just the text elements (no background)
-	let svg_content = generate_text_svg(params.text, params.author, params.balance, params.width, params.height, params.safe_area, params.text_padding)?;
+	let svg_content = generate_text_svg(params.text, params.author, params.stats, params.width, params.height, params.safe_area, params.text_padding)?;
 
 	// Set up font database for usvg
 	let mut fontdb = fontdb::Database::new();
