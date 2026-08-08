@@ -18,10 +18,6 @@ pub struct AppConfig {
 	/// Path to the typst (`.typ`) document compiled into the generated wallpaper.
 	pub vision_source: ExpandedPath,
 }
-fn yes() -> bool {
-	true
-}
-
 #[derive(Clone, Debug, Deserialize)]
 pub struct Balance {
 	pub command: String,
@@ -46,6 +42,10 @@ pub struct Quote {
 	pub text: String,
 	pub author: Option<String>,
 }
+fn yes() -> bool {
+	true
+}
+
 impl<'de> Deserialize<'de> for Quote {
 	fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
 	where
