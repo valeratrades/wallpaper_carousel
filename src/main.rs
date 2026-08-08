@@ -412,13 +412,15 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
 		}
 	}
 
-	// Forbes' endpoint intermittently stalls behind bot protection; a missing decoration must not cost us the wallpaper.
-	match billionaire_count() {
-		Ok(count) => {
-			v_utils::elog!("{count} billionaires");
-			stats.push(format!("{count} billionaires"));
+	if config.billionaires {
+		// Forbes' endpoint intermittently stalls behind bot protection; a missing decoration must not cost us the wallpaper.
+		match billionaire_count() {
+			Ok(count) => {
+				v_utils::elog!("{count} billionaires");
+				stats.push(format!("{count} billionaires"));
+			}
+			Err(e) => warn!("Billionaire count failed: {e}"),
 		}
-		Err(e) => warn!("Billionaire count failed: {e}"),
 	}
 
 	let stats_text = (!stats.is_empty()).then(|| stats.join("\n"));
