@@ -104,7 +104,8 @@ struct ForbesPersonList {
 	count: u32,
 }
 
-/// Forbes' real-time list reports its total in `count`, so we ask for a single entry and read that.
+/// The annual World's Billionaires List reports its total in `count`, so we ask for a single entry and read that.
+/// The real-time list (`person/rtb/0`) undercounts it - it only carries fortunes Forbes can price intraday.
 fn billionaire_count() -> Result<u32> {
 	let cache_path = v_utils::xdg_cache_file!("billionaires.txt");
 	if cache_path.exists() {
@@ -114,6 +115,20 @@ fn billionaire_count() -> Result<u32> {
 		}
 	}
 
+	let year: u32 = String::from_utf8(ProcessCommand::new("date").arg("+%Y").output().wrap_err("Failed to run date")?.stdout)?
+		.trim()
+		.parse()?;
+	let count = match forbes_list_count(year)? {
+		0 => forbes_list_count(year - 1)?, // new list drops in April, until then the current year's URL is served empty
+		n => n,
+	};
+	ensure!(count > 0, "Forbes has no list for either {year} or {}", year - 1);
+
+	std::fs::write(&cache_path, count.to_string())?;
+	Ok(count)
+}
+
+fn forbes_list_count(year: u32) -> Result<u32> {
 	let output = ProcessCommand::new("curl")
 		.args([
 			"-sS",
@@ -121,7 +136,7 @@ fn billionaire_count() -> Result<u32> {
 			"15",
 			"-A",
 			"Mozilla/5.0",
-			"https://www.forbes.com/forbesapi/person/rtb/0/position/true.json?fields=personName&limit=1",
+			&format!("https://www.forbes.com/forbesapi/person/billionaires/{year}/position/true.json?fields=personName&limit=1"),
 		])
 		.output()
 		.wrap_err("Failed to run curl")?;
@@ -130,10 +145,7 @@ fn billionaire_count() -> Result<u32> {
 		bail!("curl failed: {}", String::from_utf8_lossy(&output.stderr));
 	}
 
-	let rtb: ForbesRtb = serde_json::from_slice(&output.stdout).wrap_err("Forbes real-time list schema changed")?;
-	ensure!(rtb.person_list.count > 0, "Forbes returned 0 billionaires");
-
-	std::fs::write(&cache_path, rtb.person_list.count.to_string())?;
+	let rtb: ForbesRtb = serde_json::from_slice(&output.stdout).wrap_err("Forbes list schema changed")?;
 	Ok(rtb.person_list.count)
 }
 
