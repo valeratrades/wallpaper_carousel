@@ -172,9 +172,9 @@ fn parse_forbes(raw: &[u8]) -> Result<Vec<Person>> {
 }
 
 /// Spotlight on one billionaire, cached for the day so `circle` doesn't pay for a call per wallpaper switch.
-fn billionaire_blurb(list: &[Person]) -> Result<String> {
+fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<String> {
 	let cache_path = v_utils::xdg_cache_file!("billionaire_blurb.txt");
-	if cache_path.exists() {
+	if !reroll && cache_path.exists() {
 		let age = cache_path.metadata()?.modified()?.elapsed()?;
 		if age < BLURB_CACHE_TTL {
 			return Ok(std::fs::read_to_string(&cache_path)?);
@@ -416,7 +416,7 @@ fn load_last_input() -> Result<PathBuf> {
 	Ok(PathBuf::from(content.trim()))
 }
 
-fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
+fn generate_wallpaper(input_path: &Path, config: &AppConfig, reroll: bool) -> Result<()> {
 	info!("Starting wallpaper generation for: {}", input_path.display());
 
 	// Select a random quote
@@ -446,7 +446,7 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
 		// Forbes' endpoint intermittently stalls behind bot protection; a missing decoration must not cost us the wallpaper.
 		match billionaire_list() {
 			Ok(list) => {
-				let blurb = billionaire_blurb(&list).inspect_err(|e| warn!("Billionaire blurb failed: {e}")).ok(); // the count is worth rendering on its own
+				let blurb = billionaire_blurb(&list, reroll).inspect_err(|e| warn!("Billionaire blurb failed: {e}")).ok(); // the count is worth rendering on its own
 				for line in billionaire_stats(&list, blurb) {
 					v_utils::elog!("{line}");
 					stats.push(line);
@@ -596,7 +596,7 @@ fn run() -> Result<()> {
 			};
 
 			// Generate wallpaper
-			let result = generate_wallpaper(&input_path, &config);
+			let result = generate_wallpaper(&input_path, &config, false);
 
 			// Remove lock
 			remove_lock()?;
@@ -619,7 +619,7 @@ fn run() -> Result<()> {
 			let vision_path = config.vision_source.to_path_buf();
 			v_utils::log!("Using vision document: {}", vision_path.display());
 
-			let result = generate_wallpaper(&vision_path, &config);
+			let result = generate_wallpaper(&vision_path, &config, true);
 
 			// Remove lock
 			remove_lock()?;
