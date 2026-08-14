@@ -37,4 +37,14 @@ and `inset`; `vision.typ` is the goal document with `overlay()` appended to its 
 - **The page is 1920pt wide, always.** Height follows the display's aspect ratio and `--ppi` scales
   the raster to its resolution, so text keeps the same relative size on every screen.
 - **Everything renders inside the safe area** — the region visible on *all* active displays under
-  sway's `fill` — passed to typst as extra page margins.
+  sway's `fill` — passed to typst as the page margin. `edge_padding` (20pt) is the only breathing
+  room on top of it; no layer adds margins of its own.
+
+```
+┌─ page: 1920pt × display ratio ────────────────┐
+│ safe-area inset (0 when all displays agree)   │
+│  ┌─ + edge_padding ────────────────────────┐  │
+│  │  vision.typ: 2 columns, 13pt   overlay()│  │
+│  └─────────────────────────────────────────┘  │
+└───────────────────────────────────────────────┘
+```

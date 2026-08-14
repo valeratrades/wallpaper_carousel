@@ -7,7 +7,7 @@
 )
 
 #let _inset = data.at("inset", default: (:))
-/// Extra margin so nothing lands outside the region visible on every display.
+/// Page margin: the region invisible on some display, plus `edge_padding`.
 #let inset = (
   top: _inset.at("top", default: 0) * 1pt,
   bottom: _inset.at("bottom", default: 0) * 1pt,

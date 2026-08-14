@@ -6,15 +6,10 @@
   width: page-size.width,
   height: page-size.height,
   fill: rgb("#333333"),
-  margin: (
-    top: inset.top + 20pt,
-    bottom: inset.bottom + 20pt,
-    left: inset.left + 20pt,
-    right: inset.right + 20pt,
-  ),
+  margin: inset,
   columns: 2,
 )
-#set text(size: 13pt, fill: white)
+#set text(size: 12.5pt, fill: white)
 #set columns(gutter: 40pt)
 
 //TODO: add an artificially aged photo of myself at age 25/30

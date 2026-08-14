@@ -14,6 +14,8 @@ pub struct AppConfig {
 	/// Render the count of billionaires worldwide, plus a paragraph on how a random one of them made their money.
 	#[serde(default = "yes")]
 	pub billionaires: bool,
+	/// Breathing room between the text and the edge of the safe area, in pt of a 1920pt-wide page.
+	pub edge_padding: Option<u32>,
 	/// Path to the typst (`.typ`) document compiled into the generated wallpaper. `overlay.typ` and `photo.typ` are looked up next to it.
 	pub vision_source: ExpandedPath,
 }
