@@ -18,6 +18,7 @@ use v_utils::utils::eyre::exit_on_error;
 use wallpaper_carousel::config::{AppConfig, SettingsFlags};
 
 const BILLIONAIRE_CACHE_TTL: std::time::Duration = std::time::Duration::from_weeks(1);
+const BLURB_CACHE_TTL: std::time::Duration = std::time::Duration::from_days(1);
 #[derive(Debug, Parser)]
 #[command(name = "wallpaper_carousel")]
 #[command(about = "Extend wallpaper with citation overlays")]
@@ -101,34 +102,64 @@ struct ForbesRtb {
 
 #[derive(Debug, Deserialize)]
 struct ForbesPersonList {
-	count: u32,
+	#[serde(rename = "personsLists")]
+	persons_lists: Vec<Person>,
 }
 
-/// The annual World's Billionaires List reports its total in `count`, so we ask for a single entry and read that.
-/// The real-time list (`person/rtb/0`) undercounts it - it only carries fortunes Forbes can price intraday.
-fn billionaire_count() -> Result<u32> {
-	let cache_path = v_utils::xdg_cache_file!("billionaires.txt");
+#[derive(Debug, Deserialize)]
+struct Person {
+	#[serde(rename = "personName")]
+	person_name: String,
+	/// millions of USD
+	#[serde(rename = "finalWorth")]
+	final_worth: f64,
+	#[serde(default)]
+	country: Option<String>,
+	#[serde(default)]
+	source: Option<String>,
+	#[serde(default)]
+	industries: Vec<String>,
+	#[serde(default)]
+	age: Option<u32>,
+	#[serde(rename = "selfMade", default)]
+	self_made: Option<bool>,
+	#[serde(default)]
+	bios: Vec<String>,
+}
+
+/// The annual World's Billionaires List. The real-time list (`person/rtb/0`) undercounts it - it only carries fortunes Forbes can price intraday.
+fn billionaire_list() -> Result<Vec<Person>> {
+	let cache_path = v_utils::xdg_cache_file!("billionaires.json");
 	if cache_path.exists() {
 		let age = cache_path.metadata()?.modified()?.elapsed()?;
 		if age < BILLIONAIRE_CACHE_TTL {
-			return Ok(std::fs::read_to_string(&cache_path)?.trim().parse()?);
+			return parse_forbes(&std::fs::read(&cache_path)?);
 		}
 	}
 
 	let year: u32 = String::from_utf8(ProcessCommand::new("date").arg("+%Y").output().wrap_err("Failed to run date")?.stdout)?
 		.trim()
 		.parse()?;
-	let count = match forbes_list_count(year)? {
-		0 => forbes_list_count(year - 1)?, // new list drops in April, until then the current year's URL is served empty
-		n => n,
-	};
-	ensure!(count > 0, "Forbes has no list for either {year} or {}", year - 1);
-
-	std::fs::write(&cache_path, count.to_string())?;
-	Ok(count)
+	resolve_list(year, |y| {
+		let raw = fetch_forbes(y)?;
+		let list = parse_forbes(&raw)?;
+		if !list.is_empty() {
+			std::fs::write(&cache_path, &raw)?;
+		}
+		Ok(list)
+	})
 }
 
-fn forbes_list_count(year: u32) -> Result<u32> {
+fn resolve_list(year: u32, fetch: impl Fn(u32) -> Result<Vec<Person>>) -> Result<Vec<Person>> {
+	let list = match fetch(year)? {
+		l if l.is_empty() => fetch(year - 1)?, // new list drops in April, until then the current year's URL is served empty
+		l => l,
+	};
+	ensure!(!list.is_empty(), "Forbes has no list for either {year} or {}", year - 1);
+	Ok(list)
+}
+
+fn fetch_forbes(year: u32) -> Result<Vec<u8>> {
 	let output = ProcessCommand::new("curl")
 		.args([
 			"-sS",
@@ -136,7 +167,9 @@ fn forbes_list_count(year: u32) -> Result<u32> {
 			"15",
 			"-A",
 			"Mozilla/5.0",
-			&format!("https://www.forbes.com/forbesapi/person/billionaires/{year}/position/true.json?fields=personName&limit=1"),
+			&format!(
+				"https://www.forbes.com/forbesapi/person/billionaires/{year}/position/true.json?fields=rank,personName,finalWorth,country,source,industries,age,selfMade,bios&limit=4000"
+			),
 		])
 		.output()
 		.wrap_err("Failed to run curl")?;
@@ -144,9 +177,67 @@ fn forbes_list_count(year: u32) -> Result<u32> {
 	if !output.status.success() {
 		bail!("curl failed: {}", String::from_utf8_lossy(&output.stderr));
 	}
+	Ok(output.stdout)
+}
 
-	let rtb: ForbesRtb = serde_json::from_slice(&output.stdout).wrap_err("Forbes list schema changed")?;
-	Ok(rtb.person_list.count)
+fn parse_forbes(raw: &[u8]) -> Result<Vec<Person>> {
+	let rtb: ForbesRtb = serde_json::from_slice(raw).wrap_err("Forbes list schema changed")?;
+	Ok(rtb.person_list.persons_lists)
+}
+
+/// Spotlight on one billionaire, cached for the day so `circle` doesn't pay for a call per wallpaper switch.
+fn billionaire_blurb(list: &[Person]) -> Result<String> {
+	let cache_path = v_utils::xdg_cache_file!("billionaire_blurb.txt");
+	if cache_path.exists() {
+		let age = cache_path.metadata()?.modified()?.elapsed()?;
+		if age < BLURB_CACHE_TTL {
+			return Ok(std::fs::read_to_string(&cache_path)?);
+		}
+	}
+	// `ask_llm` panics on a missing key while building the client, which would cost us the wallpaper
+	ensure!(std::env::var_os("CLAUDE_TOKEN").is_some(), "CLAUDE_TOKEN not set");
+
+	let p = list.choose(&mut rand::rng()).context("Empty billionaire list")?;
+	let prompt = format!(
+		"{name}. Net worth ${worth:.1}B. Country: {country}. Source: {source}. Industries: {industries}. Age: {age}. Self-made: {self_made}.\nForbes bios:\n{bios}\n\n\
+		Write ~40 words on how this person built their fortune and what the business actually does. Only the money: drop hobbies, family, philanthropy, awards, residences, politics. \
+		Plain prose, no markdown, no preamble, lead with the name.",
+		name = p.person_name,
+		worth = p.final_worth / 1000.,
+		country = p.country.as_deref().unwrap_or("unknown"),
+		source = p.source.as_deref().unwrap_or("unknown"),
+		industries = p.industries.join(", "),
+		age = p.age.map(|a| a.to_string()).unwrap_or("unknown".to_owned()),
+		self_made = p.self_made.map(|s| s.to_string()).unwrap_or("unknown".to_owned()),
+		bios = p.bios.join("\n"),
+	);
+
+	let response = tokio::runtime::Runtime::new()?.block_on(ask_llm::Client::default().model(ask_llm::Model::Fast).max_tokens(200).ask(prompt))?;
+	let blurb = response.text.trim().to_owned();
+	std::fs::write(&cache_path, &blurb)?;
+	Ok(blurb)
+}
+
+fn billionaire_stats(list: &[Person], blurb: Option<String>) -> Vec<String> {
+	let mut lines = vec![format!("{} billionaires", list.len())];
+	lines.extend(blurb.iter().flat_map(|b| wrap(b, 60)));
+	lines
+}
+
+fn wrap(text: &str, cols: usize) -> Vec<String> {
+	let mut lines = vec![String::new()];
+	for word in text.split_whitespace() {
+		let line = lines.last_mut().expect("seeded with one line, never popped");
+		match line.is_empty() {
+			true => line.push_str(word),
+			false if line.chars().count() + 1 + word.chars().count() <= cols => {
+				line.push(' ');
+				line.push_str(word);
+			}
+			false => lines.push(word.to_owned()),
+		}
+	}
+	lines
 }
 
 fn get_cache_file_path() -> PathBuf {
@@ -426,12 +517,15 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
 
 	if config.billionaires {
 		// Forbes' endpoint intermittently stalls behind bot protection; a missing decoration must not cost us the wallpaper.
-		match billionaire_count() {
-			Ok(count) => {
-				v_utils::elog!("{count} billionaires");
-				stats.push(format!("{count} billionaires"));
+		match billionaire_list() {
+			Ok(list) => {
+				let blurb = billionaire_blurb(&list).inspect_err(|e| warn!("Billionaire blurb failed: {e}")).ok(); // the count is worth rendering on its own
+				for line in billionaire_stats(&list, blurb) {
+					v_utils::elog!("{line}");
+					stats.push(line);
+				}
 			}
-			Err(e) => warn!("Billionaire count failed: {e}"),
+			Err(e) => warn!("Billionaire list failed: {e}"),
 		}
 	}
 
@@ -930,4 +1024,39 @@ fn composite_text_on_image(params: &CompositeParams) -> Result<()> {
 	bg_image.save(params.output_path)?;
 
 	Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	const FIXTURE: &str = r#"{"personList":{"personsLists":[
+		{"rank":1,"finalWorth":342000.0,"personName":"Elon Musk","age":53,"country":"United States","source":"Tesla, SpaceX","industries":["Automotive"],"selfMade":true,"bios":["Elon Musk cofounded seven companies."]},
+		{"rank":2900,"finalWorth":1000.0,"personName":"Nameless Tail","country":"China","source":"lithium","industries":["Manufacturing"],"selfMade":true}
+	],"count":2}}"#;
+
+	#[test]
+	fn parses_forbes_payloads() {
+		let list = parse_forbes(FIXTURE.as_bytes()).unwrap();
+		assert_eq!(list.len(), 2);
+		assert_eq!(list[0].person_name, "Elon Musk");
+		assert_eq!(list[0].final_worth, 342000.0);
+		assert_eq!(list[1].bios.len(), 0);
+		assert_eq!(list[1].age, None);
+		assert_eq!(parse_forbes(br#"{"personList":{"personsLists":[],"count":0}}"#).unwrap().len(), 0);
+	}
+
+	#[test]
+	fn empty_current_year_falls_back() {
+		let fetch = |y| if y == 2026 { Ok(Vec::new()) } else { parse_forbes(FIXTURE.as_bytes()) };
+		assert_eq!(resolve_list(2026, fetch).unwrap().len(), 2);
+		assert!(resolve_list(2026, |_| Ok(Vec::new())).is_err());
+	}
+
+	#[test]
+	fn count_survives_a_missing_blurb() {
+		let list = parse_forbes(FIXTURE.as_bytes()).unwrap();
+		assert_eq!(billionaire_stats(&list, None), vec!["2 billionaires"]);
+		assert_eq!(billionaire_stats(&list, Some("a ".repeat(40).trim().to_owned()))[0], "2 billionaires");
+	}
 }

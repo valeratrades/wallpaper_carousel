@@ -8,6 +8,7 @@ edition = "2024"
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
 [dependencies]
+ask_llm = { version = "2.2.2", default-features = false }
 clap = { version = "^4", features = ["derive"] }
 color-eyre = "^0.6.5"
 config = "^0.15"
@@ -15,14 +16,16 @@ derive-new = "^0"
 fontdb = "^0.23"
 image = "^0.25"
 libc = "^0.2"
+miette = "^7"
 rand = "^0.9"
 resvg = "^0.45"
 serde = { version = "^1", features = ["derive"] }
 serde_json = "^1"
 tiny-skia = "^0.11"
+tokio = { version = "1", features = ["rt-multi-thread"] }
 tracing = "^0.1"
 usvg = "^0.45"
-v_utils = { version = "2.13.1", features = ["tracing", "cli"] }
+v_utils = { version = "2.17.5", features = ["tracing", "cli", "xdg"] }
 walkdir = "^2"
 xdg = "^3"
 

@@ -1,24 +1,24 @@
 use std::process::Command;
 
 use color_eyre::eyre::{Result, WrapErr as _, bail};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use v_utils::{
+	io::ExpandedPath,
 	macros::{MyConfigPrimitives, Settings},
-	prelude::ExpandedPath,
 };
 
 #[derive(Clone, Debug, MyConfigPrimitives, Settings)]
 pub struct AppConfig {
 	pub quotes: Vec<Quote>,
 	pub balance: Option<Balance>,
-	/// Render today's count of billionaires worldwide, fetched from Forbes' real-time list.
+	/// Render the count of billionaires worldwide, plus a paragraph on how a random one of them made their money.
 	#[serde(default = "yes")]
 	pub billionaires: bool,
 	pub text_padding: Option<u32>,
 	/// Path to the typst (`.typ`) document compiled into the generated wallpaper.
 	pub vision_source: ExpandedPath,
 }
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Balance {
 	pub command: String,
 	pub label: Option<String>,
@@ -37,7 +37,7 @@ impl Balance {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Quote {
 	pub text: String,
 	pub author: Option<String>,
