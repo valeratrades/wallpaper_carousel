@@ -466,7 +466,6 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, reroll: bool) -> Re
 	// The page is always PAGE_WIDTH wide; `--ppi` alone scales the raster to the display, so text keeps its relative size.
 	const PAGE_WIDTH: u32 = 1920;
 	let to_pt = |px: u32| (px as f32 * PAGE_WIDTH as f32 / display_width as f32).round() as u32;
-	let padding = config.text_padding.unwrap_or(15);
 
 	let safe_area = calculate_safe_area(display_width, display_height, &all_displays);
 	v_utils::elog!(
@@ -485,10 +484,10 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, reroll: bool) -> Re
 		"width": PAGE_WIDTH,
 		"height": to_pt(display_height),
 		"inset": {
-			"top": to_pt(safe_area.y) + padding,
-			"bottom": to_pt(display_height - safe_area.y - safe_area.height) + padding,
-			"left": to_pt(safe_area.x) + padding,
-			"right": to_pt(display_width - safe_area.x - safe_area.width) + padding,
+			"top": to_pt(safe_area.y),
+			"bottom": to_pt(display_height - safe_area.y - safe_area.height),
+			"left": to_pt(safe_area.x),
+			"right": to_pt(display_width - safe_area.x - safe_area.width),
 		},
 	});
 
