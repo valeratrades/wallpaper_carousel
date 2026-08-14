@@ -15,7 +15,7 @@ pub struct AppConfig {
 	#[serde(default = "yes")]
 	pub billionaires: bool,
 	pub text_padding: Option<u32>,
-	/// Path to the typst (`.typ`) document compiled into the generated wallpaper.
+	/// Path to the typst (`.typ`) document compiled into the generated wallpaper. `overlay.typ` and `photo.typ` are looked up next to it.
 	pub vision_source: ExpandedPath,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]

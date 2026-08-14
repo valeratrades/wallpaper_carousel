@@ -1,11 +1,17 @@
 #import "@local/wrap-it:0.1.1": wrap-content
+#import "overlay.typ": inset, overlay, page-size
 #let wrap = wrap-content.with(align: right)
 
 #set page(
-  width: 1920pt,
-  height: 1080pt,
+  width: page-size.width,
+  height: page-size.height,
   fill: rgb("#333333"),
-  margin: (top: 30pt, bottom: 30pt, left: 100pt, right: 300pt),
+  margin: (
+    top: inset.top + 30pt,
+    bottom: inset.bottom + 30pt,
+    left: inset.left + 100pt,
+    right: inset.right + 60pt,
+  ),
   columns: 2,
 )
 #set text(size: 11pt, fill: white)
@@ -111,3 +117,6 @@ for each of these, imagine a picture where the statement is true, and you have a
 - reinforce horrid fear of not succeeding. You must have a fully formed picture of exactly where you will be; same as what you are running from. I would rather die than become like those pathetic loosers.
 - $>= 10%$ monthly earnings _*must*_ be spent on education. In the beginning that will be paying people directly; later on more and more just the cost of running expirements.
 - every inconducive emotion preventing me from making a necessary action, triggers #link("https://youtu.be/33zWDyEHqM4?t=3041&si=2mZl_xPyRakC6zll")[DISARM protocol], and then gets logged to the journal postfactum.
+
+#v(40pt)
+#overlay()

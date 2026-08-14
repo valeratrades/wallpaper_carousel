@@ -2,7 +2,6 @@
 use std::{
 	path::{Path, PathBuf},
 	process::Command as ProcessCommand,
-	sync::Arc,
 };
 
 use clap::Parser;
@@ -10,7 +9,6 @@ use color_eyre::{
 	Result,
 	eyre::{Context, ContextCompat, bail, ensure},
 };
-use image::GenericImageView;
 use rand::prelude::IndexedRandom;
 use serde::Deserialize;
 use tracing::{info, warn};
@@ -80,18 +78,6 @@ struct SafeArea {
 	y: u32,
 	width: u32,
 	height: u32,
-}
-
-struct CompositeParams<'a> {
-	bg_image_path: &'a Path,
-	output_path: &'a Path,
-	text: &'a str,
-	author: Option<&'a str>,
-	stats: Option<&'a str>,
-	width: u32,
-	height: u32,
-	safe_area: &'a SafeArea,
-	text_padding: u32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -219,25 +205,9 @@ fn billionaire_blurb(list: &[Person]) -> Result<String> {
 }
 
 fn billionaire_stats(list: &[Person], blurb: Option<String>) -> Vec<String> {
-	let mut lines = vec![format!("{} billionaires", list.len())];
-	lines.extend(blurb.iter().flat_map(|b| wrap(b, 60)));
-	lines
-}
-
-fn wrap(text: &str, cols: usize) -> Vec<String> {
-	let mut lines = vec![String::new()];
-	for word in text.split_whitespace() {
-		let line = lines.last_mut().expect("seeded with one line, never popped");
-		match line.is_empty() {
-			true => line.push_str(word),
-			false if line.chars().count() + 1 + word.chars().count() <= cols => {
-				line.push(' ');
-				line.push_str(word);
-			}
-			false => lines.push(word.to_owned()),
-		}
-	}
-	lines
+	let mut stats = vec![format!("{} billionaires", list.len())];
+	stats.extend(blurb);
+	stats
 }
 
 fn get_cache_file_path() -> PathBuf {
@@ -249,80 +219,37 @@ fn get_lock_file_path() -> PathBuf {
 }
 
 fn get_supported_image_extensions() -> Vec<&'static str> {
-	// Based on image crate's supported formats
-	vec!["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "tiff", "tif"]
+	// what typst can embed
+	vec!["jpg", "jpeg", "png", "gif", "webp", "svg"]
 }
 
-fn get_newest_source_mtime(src_typ_dir: &Path) -> Result<std::time::SystemTime> {
-	let mut newest = std::time::SystemTime::UNIX_EPOCH;
-
-	for entry in walkdir::WalkDir::new(src_typ_dir).into_iter().filter_map(|e| e.ok()) {
-		if entry.file_type().is_file() {
-			let path = entry.path();
-			// Skip the output files
-			if path.file_name().map(|n| n.to_string_lossy().starts_with("output")).unwrap_or(false) {
-				continue;
-			}
-			if let Ok(metadata) = path.metadata() {
-				if let Ok(mtime) = metadata.modified() {
-					if mtime > newest {
-						newest = mtime;
-					}
-				}
-			}
+/// `--root /` so `photo.typ` can read a background from anywhere on disk. `output{n}.png` lets us
+/// detect multi-page documents, which mean the overlay no longer fits and we refuse to render.
+fn compile_wallpaper(doc: &Path, overlay: &serde_json::Value, ppi: f32) -> Result<PathBuf> {
+	ensure!(doc.exists(), "Typst document does not exist: {}", doc.display());
+	let output_path = v_utils::xdg_state_file!("extended.png");
+	let stem = output_path.with_extension("");
+	let page = |n: u8| PathBuf::from(format!("{}{n}.png", stem.display()));
+	for n in 1..=2 {
+		if page(n).exists() {
+			std::fs::remove_file(page(n))?;
 		}
 	}
 
-	Ok(newest)
-}
+	let output = ProcessCommand::new("typst")
+		.args(["compile", "--format", "png", "--root", "/", "--ppi"])
+		.arg(ppi.to_string())
+		.arg("--input")
+		.arg(format!("overlay={overlay}"))
+		.arg(doc)
+		.arg(format!("{}{{n}}.png", stem.display()))
+		.output()
+		.wrap_err("Failed to run typst")?;
+	ensure!(output.status.success(), "typst compilation failed:\n{}", String::from_utf8_lossy(&output.stderr));
+	ensure!(!page(2).exists(), "{} rendered more than 1 page: the overlay no longer fits", doc.display());
 
-fn regenerate_vision_if_needed(vision_source: &Path) -> Result<PathBuf> {
-	// `vision_source` is the configured `.typ` document. We compile it directly (its parent
-	// dir holds any assets it imports) and cache the rendered png under XDG_CACHE_HOME,
-	// recompiling only when a source file is newer than the cached output.
-	if !vision_source.exists() {
-		bail!("Configured vision source does not exist: {}", vision_source.display());
-	}
-	let src_dir = vision_source.parent().context("Vision source has no parent directory")?;
-	let vision_png = v_utils::xdg_cache_file!("vision.png");
-
-	let needs_regeneration = if vision_png.exists() {
-		let png_mtime = vision_png.metadata()?.modified()?;
-		let src_mtime = get_newest_source_mtime(src_dir)?;
-		src_mtime > png_mtime
-	} else {
-		true
-	};
-
-	if needs_regeneration {
-		v_utils::log!("Vision sources are newer than cached output, regenerating...");
-
-		// Render straight from the source into the cache. `output{n}.png` lets us detect
-		// multi-page documents, which we reject.
-		let render_stem = vision_png.with_extension("");
-		let render_pattern = format!("{}{{n}}.png", render_stem.display());
-		let output = ProcessCommand::new("typst")
-			.args(["compile", "--format", "png"])
-			.arg(vision_source)
-			.arg(&render_pattern)
-			.output()?;
-
-		if !output.status.success() {
-			bail!("typst compilation failed:\n{}", String::from_utf8_lossy(&output.stderr));
-		}
-
-		let page2 = PathBuf::from(format!("{}2.png", render_stem.display()));
-		if page2.exists() {
-			bail!("Error: More than 1 page generated. Vision document must be single-page.");
-		}
-
-		let page1 = PathBuf::from(format!("{}1.png", render_stem.display()));
-		std::fs::rename(&page1, &vision_png)?;
-
-		v_utils::log!("Regenerated vision document: {}", vision_png.display());
-	}
-
-	Ok(vision_png)
+	std::fs::rename(page(1), &output_path)?;
+	Ok(output_path)
 }
 
 fn find_next_image(current_path: &Path, backwards: bool, directory: Option<&Path>) -> Result<PathBuf> {
@@ -529,54 +456,53 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig) -> Result<()> {
 		}
 	}
 
-	let stats_text = (!stats.is_empty()).then(|| stats.join("\n"));
-
-	v_utils::log!("Generating CSS...");
-
-	// Get display resolution from swaymsg
 	let (display_width, display_height) = get_display_resolution()?;
-
-	// Get all active displays to calculate safe area
 	let all_displays = get_all_active_displays()?;
 	v_utils::elog!("Found {} active display(s)", all_displays.len());
 	for (i, (w, h)) in all_displays.iter().enumerate() {
 		v_utils::elog!("  Display {}: {}x{} (ratio: {:.3})", i + 1, w, h, *w as f32 / *h as f32);
 	}
 
-	// Save resized background image to temp location
-	let temp_bg_path = v_utils::xdg_state_file!("background_temp.png");
-	let img = image::open(input_path)?;
-	let resized_img = resize_fill(img, display_width, display_height);
-	let (img_width, img_height) = resized_img.dimensions();
-	resized_img.save(&temp_bg_path)?;
+	// The page is always PAGE_WIDTH wide; `--ppi` alone scales the raster to the display, so text keeps its relative size.
+	const PAGE_WIDTH: u32 = 1920;
+	let to_pt = |px: u32| (px as f32 * PAGE_WIDTH as f32 / display_width as f32).round() as u32;
+	let padding = config.text_padding.unwrap_or(15);
 
-	// Calculate safe area that will be visible on all monitors
-	let safe_area = calculate_safe_area(img_width, img_height, &all_displays);
+	let safe_area = calculate_safe_area(display_width, display_height, &all_displays);
 	v_utils::elog!(
-		"Safe area: x={}, y={}, width={}, height={} ({:.1}% of image)",
+		"Safe area: x={}, y={}, width={}, height={} ({:.1}% of the frame)",
 		safe_area.x,
 		safe_area.y,
 		safe_area.width,
 		safe_area.height,
-		(safe_area.width * safe_area.height) as f32 / (img_width * img_height) as f32 * 100.0
+		(safe_area.width * safe_area.height) as f32 / (display_width * display_height) as f32 * 100.0
 	);
 
-	// Composite text onto background image
-	let text_padding = config.text_padding.unwrap_or(15);
-	let output_path = v_utils::xdg_state_file!("extended.png");
-	composite_text_on_image(&CompositeParams {
-		bg_image_path: &temp_bg_path,
-		output_path: &output_path,
-		text: &quote.text,
-		author: quote.author.as_deref(),
-		stats: stats_text.as_deref(),
-		width: img_width,
-		height: img_height,
-		safe_area: &safe_area,
-		text_padding,
-	})?;
+	let mut overlay = serde_json::json!({
+		"quote": quote.text,
+		"author": quote.author,
+		"stats": stats,
+		"width": PAGE_WIDTH,
+		"height": to_pt(display_height),
+		"inset": {
+			"top": to_pt(safe_area.y) + padding,
+			"bottom": to_pt(display_height - safe_area.y - safe_area.height) + padding,
+			"left": to_pt(safe_area.x) + padding,
+			"right": to_pt(display_width - safe_area.x - safe_area.width) + padding,
+		},
+	});
 
-	// Set wallpaper using swaymsg
+	// A `.typ` input is the vision document itself; anything else is a photo we hand to `photo.typ` as a background.
+	let doc = match input_path.extension().is_some_and(|e| e == "typ") {
+		true => input_path.to_owned(),
+		false => {
+			overlay["bg"] = serde_json::json!(std::fs::canonicalize(input_path)?); // typst resolves it against `--root /`
+			config.vision_source.as_ref().parent().context("Vision source has no parent directory")?.join("photo.typ")
+		}
+	};
+
+	let output_path = compile_wallpaper(&doc, &overlay, 72. * display_width as f32 / PAGE_WIDTH as f32)?;
+
 	ProcessCommand::new("swaymsg")
 		.args(["output", "*", "background", output_path.to_str().unwrap(), "fill"])
 		.output()?;
@@ -690,11 +616,9 @@ fn run() -> Result<()> {
 			// Create lock for this process
 			create_lock()?;
 
-			// Get the configured vision image path, regenerating if needed
-			let vision_path = regenerate_vision_if_needed(config.vision_source.as_ref())?;
-			v_utils::log!("Using vision image: {}", vision_path.display());
+			let vision_path = config.vision_source.to_path_buf();
+			v_utils::log!("Using vision document: {}", vision_path.display());
 
-			// Generate wallpaper using the vision document
 			let result = generate_wallpaper(&vision_path, &config);
 
 			// Remove lock
@@ -781,249 +705,6 @@ fn calculate_safe_area(img_width: u32, img_height: u32, displays: &[(u32, u32)])
 		width: max_x.saturating_sub(min_x),
 		height: max_y.saturating_sub(min_y),
 	}
-}
-
-fn resize_fill(img: image::DynamicImage, target_width: u32, target_height: u32) -> image::DynamicImage {
-	use image::{DynamicImage, GenericImageView, imageops};
-
-	let (img_width, img_height) = img.dimensions();
-	let img_ratio = img_width as f32 / img_height as f32;
-	let target_ratio = target_width as f32 / target_height as f32;
-
-	let (scaled_width, scaled_height) = if img_ratio > target_ratio {
-		let scaled_height = target_height;
-		let scaled_width = (target_height as f32 * img_ratio) as u32;
-		(scaled_width, scaled_height)
-	} else {
-		let scaled_width = target_width;
-		let scaled_height = (target_width as f32 / img_ratio) as u32;
-		(scaled_width, scaled_height)
-	};
-
-	let resized = img.resize_exact(scaled_width, scaled_height, imageops::FilterType::Lanczos3);
-
-	// Crop from right/bottom (keep left/top aligned) since content typically starts there
-	let x_offset = 0;
-	let y_offset = 0;
-
-	DynamicImage::ImageRgba8(imageops::crop_imm(&resized.to_rgba8(), x_offset, y_offset, target_width, target_height).to_image())
-}
-
-fn generate_text_svg(text: &str, author: Option<&str>, stats: Option<&str>, width: u32, height: u32, safe_area: &SafeArea, text_padding: u32) -> Result<String> {
-	// Nested padding levels: [level0, level1, level2, level3, level4]
-	// Each level is half of the previous
-	let padding_levels: [u32; 5] = [text_padding, text_padding / 2, text_padding / 4, text_padding / 8, text_padding / 16];
-	// Escape HTML entities in text
-	let escaped_text = text
-		.replace('&', "&amp;")
-		.replace('<', "&lt;")
-		.replace('>', "&gt;")
-		.replace('"', "&quot;")
-		.replace('\'', "&apos;");
-
-	// Calculate text widths (approximate for monospace: char_count * char_width)
-	let quote_font_size = 28;
-	let char_width_quote = (quote_font_size as f32 * 0.6) as u32; // Monospace chars are ~0.6 of font size
-	let quote_lines: Vec<&str> = escaped_text.lines().collect();
-	let max_quote_line_len = quote_lines.iter().map(|l| l.len()).max().unwrap_or(0);
-	let quote_text_width = max_quote_line_len as u32 * char_width_quote;
-
-	// Position quote in top-right corner of safe area with level 0 padding
-	// We use right alignment, so quote_right_edge is the anchor point
-	let quote_right_edge = safe_area.x + safe_area.width - padding_levels[0];
-	let quote_x = quote_right_edge - quote_text_width;
-	let quote_y = safe_area.y + padding_levels[0] * 2;
-
-	// Create tspan elements
-	let quote_tspans: String = quote_lines
-		.iter()
-		.enumerate()
-		.map(|(i, line)| {
-			if i == 0 {
-				format!(r#"<tspan x="{quote_x}" dy="0">{line}</tspan>"#)
-			} else {
-				format!(r#"<tspan x="{quote_x}" dy="1.2em">{line}</tspan>"#)
-			}
-		})
-		.collect::<Vec<_>>()
-		.join("\n      ");
-
-	// Calculate height of quote block
-	let line_height = 34; // 28px * 1.2 ≈ 34
-	let quote_height = quote_lines.len() as u32 * line_height;
-
-	// Author is nested inside quote component (level 1 padding)
-	let author_y = quote_y + quote_height + padding_levels[1];
-
-	let (author_element, author_height) = if let Some(author) = author {
-		let escaped_author = author
-			.replace('&', "&amp;")
-			.replace('<', "&lt;")
-			.replace('>', "&gt;")
-			.replace('"', "&quot;")
-			.replace('\'', "&apos;");
-
-		// Calculate author text width
-		let author_text = format!("© {escaped_author}");
-
-		// Position author at the same right edge as the quote (right-aligned with text-anchor: end)
-		let author_x = quote_right_edge;
-		let author_height = 21;
-		(format!(r#"<text class="author" x="{author_x}" y="{author_y}">{author_text}</text>"#), author_height)
-	} else {
-		(String::new(), 0)
-	};
-
-	// Calculate the bottom of the quote component (for positioning balance below)
-	// Use level 0 padding after the entire quote component
-	let quote_bottom_y = if author.is_some() {
-		author_y + author_height + padding_levels[0]
-	} else {
-		quote_y + quote_height + padding_levels[0]
-	};
-
-	let stats_element = if let Some(stats) = stats {
-		let escaped_stats = stats
-			.replace('&', "&amp;")
-			.replace('<', "&lt;")
-			.replace('>', "&gt;")
-			.replace('"', "&quot;")
-			.replace('\'', "&apos;");
-
-		let stats_font_size = 20;
-		let char_width_stats = (stats_font_size as f32 * 0.6) as u32;
-		let stats_lines: Vec<&str> = escaped_stats.lines().collect();
-		let max_stats_line_len = stats_lines.iter().map(|l| l.len()).max().unwrap_or(0);
-		let stats_text_width = max_stats_line_len as u32 * char_width_stats;
-
-		// Position stats right below the quote component (level 0 padding from right edge)
-		let stats_x = safe_area.x + safe_area.width - padding_levels[0] - stats_text_width;
-		let stats_y = quote_bottom_y;
-
-		// Create tspan elements
-		let stats_tspans: String = stats_lines
-			.iter()
-			.enumerate()
-			.map(|(i, line)| {
-				if i == 0 {
-					format!(r#"<tspan x="{stats_x}" dy="0">{line}</tspan>"#)
-				} else {
-					format!(r#"<tspan x="{stats_x}" dy="1.2em">{line}</tspan>"#)
-				}
-			})
-			.collect::<Vec<_>>()
-			.join("\n      ");
-
-		format!(
-			r#"<text class="stats" x="{stats_x}" y="{stats_y}">
-      {stats_tspans}
-  </text>"#
-		)
-	} else {
-		String::new()
-	};
-
-	let svg = format!(
-		r#"<?xml version="1.0" encoding="UTF-8"?>
-<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <style>
-      .quote {{
-        font-family: 'DejaVu Sans Mono';
-        font-size: 28px;
-        fill: white;
-        text-anchor: start;
-      }}
-      .author {{
-        font-family: 'DejaVu Sans Mono';
-        font-size: 21px;
-        fill: white;
-        text-anchor: end;
-      }}
-      .stats {{
-        font-family: 'DejaVu Sans Mono';
-        font-size: 20px;
-        fill: white;
-        text-anchor: start;
-      }}
-    </style>
-  </defs>
-  <text class="quote" x="{quote_x}" y="{quote_y}">
-      {quote_tspans}
-  </text>
-  {author_element}
-  {stats_element}
-</svg>"#,
-	);
-
-	Ok(svg)
-}
-
-fn composite_text_on_image(params: &CompositeParams) -> Result<()> {
-	// Load background image
-	let mut bg_image = image::open(params.bg_image_path)?.to_rgba8();
-
-	// Generate SVG with just the text elements (no background)
-	let svg_content = generate_text_svg(params.text, params.author, params.stats, params.width, params.height, params.safe_area, params.text_padding)?;
-
-	// Set up font database for usvg
-	let mut fontdb = fontdb::Database::new();
-	fontdb.load_system_fonts();
-
-	// fontdb's fontconfig parser doesn't iterate XDG_DATA_DIRS for font directories like the C fontconfig does,
-	// so we load them manually to pick up home-manager fonts and other XDG-registered fonts.
-	if let Ok(xdg_data_dirs) = std::env::var("XDG_DATA_DIRS") {
-		for dir in xdg_data_dirs.split(':') {
-			let fonts_dir = Path::new(dir).join("fonts");
-			if fonts_dir.is_dir() {
-				fontdb.load_fonts_dir(fonts_dir);
-			}
-		}
-	}
-
-	// Try to load DejaVu Sans Mono from common locations (for dev environment)
-	let dev_font_path = std::env::current_dir().ok().map(|p| p.join("assets/DejaVuSansMono.ttf"));
-	if let Some(path) = dev_font_path
-		&& path.exists()
-	{
-		let e = fontdb.load_font_file(&path);
-		warn!(?e) // Ignore errors, - means system fonts are already loaded
-	}
-
-	let options = usvg::Options {
-		fontdb: Arc::new(fontdb),
-		..Default::default()
-	};
-
-	let tree = usvg::Tree::from_str(&svg_content, &options)?;
-
-	// Render text SVG to a transparent pixmap
-	let mut text_pixmap = tiny_skia::Pixmap::new(params.width, params.height).context("Failed to create pixmap")?;
-
-	resvg::render(&tree, tiny_skia::Transform::default(), &mut text_pixmap.as_mut());
-
-	// Composite text layer onto background image
-	for y in 0..params.height {
-		for x in 0..params.width {
-			let text_pixel = text_pixmap.pixel(x, y).context("Failed to get pixel")?;
-			let alpha = text_pixel.alpha();
-
-			if alpha > 0 {
-				let bg_pixel = bg_image.get_pixel_mut(x, y);
-				let alpha_f = alpha as f32 / 255.0;
-
-				// Alpha blending
-				bg_pixel[0] = ((text_pixel.red() as f32 * alpha_f) + (bg_pixel[0] as f32 * (1.0 - alpha_f))) as u8;
-				bg_pixel[1] = ((text_pixel.green() as f32 * alpha_f) + (bg_pixel[1] as f32 * (1.0 - alpha_f))) as u8;
-				bg_pixel[2] = ((text_pixel.blue() as f32 * alpha_f) + (bg_pixel[2] as f32 * (1.0 - alpha_f))) as u8;
-			}
-		}
-	}
-
-	// Save the composited image
-	bg_image.save(params.output_path)?;
-
-	Ok(())
 }
 
 #[cfg(test)]
