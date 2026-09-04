@@ -180,9 +180,6 @@ fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<String> {
 			return Ok(std::fs::read_to_string(&cache_path)?);
 		}
 	}
-	// `ask_llm` panics on a missing key while building the client, which would cost us the wallpaper
-	ensure!(std::env::var_os("CLAUDE_TOKEN").is_some(), "CLAUDE_TOKEN not set");
-
 	let p = list.choose(&mut rand::rng()).context("Empty billionaire list")?;
 	let prompt = format!(
 		"{name}. Net worth ${worth:.1}B. Country: {country}. Source: {source}. Industries: {industries}. Age: {age}. Self-made: {self_made}.\nForbes bios:\n{bios}\n\n\

@@ -103,9 +103,9 @@ checksum = "7d902e3d592a523def97af8f317b08ce16b7ab854c1985a0c671e6f15cebc236"
 
 [[package]]
 name = "ask_llm"
-version = "2.2.2"
+version = "3.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6cb78d52eb2c7f0205cd9c7a41be26f9122ab97465e4895126cb64c67d0f3c4"
+checksum = "1f131f0a58f59d575b6ec0d57226b7851197f2e88c49049442bd749f93e4f699"
 dependencies = [
  "base64",
  "bytes",
@@ -118,6 +118,8 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tempfile",
+ "thiserror",
  "tokio",
  "tracing",
  "v_utils",
@@ -2509,6 +2511,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
+name = "signal-hook-registry"
+version = "1.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4db69cba1110affc0e9f7bcd48bbf87b3f4fc7c61fc9155afd4c469eb3d6c1b"
+dependencies = [
+ "errno",
+ "libc",
+]
+
+[[package]]
 name = "simd-adler32"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2853,6 +2865,7 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",
