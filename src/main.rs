@@ -116,24 +116,32 @@ struct Person {
 /// The annual World's Billionaires List. The real-time list (`person/rtb/0`) undercounts it - it only carries fortunes Forbes can price intraday.
 fn billionaire_list() -> Result<Vec<Person>> {
 	let cache_path = v_utils::xdg_cache_file!("billionaires.json");
+	let cached = || parse_forbes(&std::fs::read(&cache_path)?);
 	if cache_path.exists() {
 		let age = cache_path.metadata()?.modified()?.elapsed()?;
 		if age < BILLIONAIRE_CACHE_TTL {
-			return parse_forbes(&std::fs::read(&cache_path)?);
+			return cached();
 		}
 	}
 
 	let year: u32 = String::from_utf8(ProcessCommand::new("date").arg("+%Y").output().wrap_err("Failed to run date")?.stdout)?
 		.trim()
 		.parse()?;
-	resolve_list(year, |y| {
+	let fresh = resolve_list(year, |y| {
 		let raw = fetch_forbes(y)?;
 		let list = parse_forbes(&raw)?;
 		if !list.is_empty() {
 			std::fs::write(&cache_path, &raw)?;
 		}
 		Ok(list)
-	})
+	});
+	match fresh {
+		Err(e) if cache_path.exists() => {
+			warn!("Forbes refresh failed, reusing the expired list: {e}");
+			cached()
+		}
+		other => other,
+	}
 }
 
 fn resolve_list(year: u32, fetch: impl Fn(u32) -> Result<Vec<Person>>) -> Result<Vec<Person>> {
@@ -172,6 +180,7 @@ fn parse_forbes(raw: &[u8]) -> Result<Vec<Person>> {
 }
 
 /// Spotlight on one billionaire, cached for the day so `circle` doesn't pay for a call per wallpaper switch.
+/// The cache is only ever overwritten by a successful call, so it doubles as the fallback when one fails.
 fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<String> {
 	let cache_path = v_utils::xdg_cache_file!("billionaire_blurb.txt");
 	if !reroll && cache_path.exists() {
@@ -195,10 +204,18 @@ fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<String> {
 		bios = p.bios.join("\n"),
 	);
 
-	let response = tokio::runtime::Runtime::new()?.block_on(ask_llm::Client::default().model(ask_llm::Model::Fast).max_tokens(200).ask(prompt))?;
-	let blurb = response.text.trim().to_owned();
-	std::fs::write(&cache_path, &blurb)?;
-	Ok(blurb)
+	match tokio::runtime::Runtime::new()?.block_on(ask_llm::Client::default().model(ask_llm::Model::Fast).max_tokens(200).ask(prompt)) {
+		Ok(response) => {
+			let blurb = response.text.trim().to_owned();
+			std::fs::write(&cache_path, &blurb)?;
+			Ok(blurb)
+		}
+		Err(e) if cache_path.exists() => {
+			warn!("Blurb call failed, reusing the expired one: {e}");
+			Ok(std::fs::read_to_string(&cache_path)?)
+		}
+		Err(e) => Err(e),
+	}
 }
 
 fn billionaire_stats(list: &[Person], blurb: Option<String>) -> Vec<String> {
