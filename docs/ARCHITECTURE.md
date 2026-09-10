@@ -32,8 +32,9 @@ and `inset`; `vision.typ` is the goal document with `overlay()` appended to its 
   no configuration in which it silently covers something.
 - **One payload, one hand-off.** Everything typst needs arrives as a single `--input overlay=<json>`.
   Adding an information source is a new JSON field, never a new file or a new argument.
-- **A decoration must never cost the wallpaper.** Forbes and the LLM blurb are best-effort; every
-  other failure aborts the run rather than rendering something wrong.
+- **A decoration must never cost the wallpaper.** Forbes and the LLM blurb are best-effort — they
+  fall back to their cache, and a render that used an expired one re-renders on exponential backoff
+  until the network returns. Every other failure aborts the run rather than rendering something wrong.
 - **The page is 1920pt wide, always.** Height follows the display's aspect ratio and `--ppi` scales
   the raster to its resolution, so text keeps the same relative size on every screen.
 - **Everything renders inside the safe area** — the region visible on *all* active displays under

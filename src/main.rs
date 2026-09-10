@@ -17,6 +17,9 @@ use wallpaper_carousel::config::{AppConfig, SettingsFlags};
 
 const BILLIONAIRE_CACHE_TTL: std::time::Duration = std::time::Duration::from_weeks(1);
 const BLURB_CACHE_TTL: std::time::Duration = std::time::Duration::from_days(1);
+/// sway starts us before the link is up, so the first render routinely lands on a stale cache
+const RETRY_BACKOFF_START: std::time::Duration = std::time::Duration::from_secs(30);
+const RETRY_BACKOFF_CAP: std::time::Duration = std::time::Duration::from_secs(3600);
 #[derive(Debug, Parser)]
 #[command(name = "wallpaper_carousel")]
 #[command(about = "Extend wallpaper with citation overlays")]
@@ -181,12 +184,13 @@ fn parse_forbes(raw: &[u8]) -> Result<Vec<Person>> {
 
 /// Spotlight on one billionaire, cached for the day so `circle` doesn't pay for a call per wallpaper switch.
 /// The cache is only ever overwritten by a successful call, so it doubles as the fallback when one fails.
-fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<String> {
+/// The flag is false when the text came out of an *expired* cache, which is the caller's cue to retry.
+fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<(String, bool)> {
 	let cache_path = v_utils::xdg_cache_file!("billionaire_blurb.txt");
 	if !reroll && cache_path.exists() {
 		let age = cache_path.metadata()?.modified()?.elapsed()?;
 		if age < BLURB_CACHE_TTL {
-			return Ok(std::fs::read_to_string(&cache_path)?);
+			return Ok((std::fs::read_to_string(&cache_path)?, true));
 		}
 	}
 	let p = list.choose(&mut rand::rng()).context("Empty billionaire list")?;
@@ -208,11 +212,11 @@ fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<String> {
 		Ok(response) => {
 			let blurb = response.text.trim().to_owned();
 			std::fs::write(&cache_path, &blurb)?;
-			Ok(blurb)
+			Ok((blurb, true))
 		}
 		Err(e) if cache_path.exists() => {
 			warn!("Blurb call failed, reusing the expired one: {e}");
-			Ok(std::fs::read_to_string(&cache_path)?)
+			Ok((std::fs::read_to_string(&cache_path)?, false))
 		}
 		Err(e) => Err(e),
 	}
@@ -430,14 +434,13 @@ fn load_last_input() -> Result<PathBuf> {
 	Ok(PathBuf::from(content.trim()))
 }
 
-fn generate_wallpaper(input_path: &Path, config: &AppConfig, reroll: bool) -> Result<()> {
+/// Renders the wallpaper unconditionally; returns whether every decoration on it is current.
+fn generate_wallpaper(input_path: &Path, config: &AppConfig, quote: &wallpaper_carousel::config::Quote, reroll: bool) -> Result<bool> {
 	info!("Starting wallpaper generation for: {}", input_path.display());
-
-	// Select a random quote
-	let quote = config.quotes.choose(&mut rand::rng()).context("No quotes configured")?;
 	v_utils::elog!("Selected quote: {:?}", quote.text);
 	v_utils::elog!("Author: {:?}", quote.author);
 
+	let mut fresh = true;
 	let mut stats: Vec<String> = Vec::new();
 
 	if let Some(balance) = &config.balance {
@@ -461,12 +464,16 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, reroll: bool) -> Re
 		match billionaire_list() {
 			Ok(list) => {
 				let blurb = billionaire_blurb(&list, reroll).inspect_err(|e| warn!("Billionaire blurb failed: {e}")).ok(); // the count is worth rendering on its own
-				for line in billionaire_stats(&list, blurb) {
+				fresh = matches!(&blurb, Some((_, true)));
+				for line in billionaire_stats(&list, blurb.map(|(text, _)| text)) {
 					v_utils::elog!("{line}");
 					stats.push(line);
 				}
 			}
-			Err(e) => warn!("Billionaire list failed: {e}"),
+			Err(e) => {
+				warn!("Billionaire list failed: {e}");
+				fresh = false;
+			}
 		}
 	}
 
@@ -523,6 +530,22 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, reroll: bool) -> Re
 
 	v_utils::log!("Wallpaper set to {}", output_path.display());
 
+	Ok(fresh)
+}
+
+/// The quote is picked once, so a retry only swaps in the data that was missing.
+fn generate_until_fresh(input_path: &Path, config: &AppConfig, reroll: bool) -> Result<()> {
+	let quote = config.quotes.choose(&mut rand::rng()).context("No quotes configured")?;
+	let mut backoff = RETRY_BACKOFF_START;
+	while !generate_wallpaper(input_path, config, quote, reroll)? {
+		if backoff > RETRY_BACKOFF_CAP {
+			warn!("Giving up on refreshing the wallpaper; it stays on the last cached data");
+			break;
+		}
+		info!("Rendered off a stale cache, retrying in {}s", backoff.as_secs());
+		std::thread::sleep(backoff);
+		backoff *= 2;
+	}
 	Ok(())
 }
 
@@ -610,7 +633,7 @@ fn run() -> Result<()> {
 			};
 
 			// Generate wallpaper
-			let result = generate_wallpaper(&input_path, &config, false);
+			let result = generate_until_fresh(&input_path, &config, false);
 
 			// Remove lock
 			remove_lock()?;
@@ -633,7 +656,7 @@ fn run() -> Result<()> {
 			let vision_path = config.vision_source.to_path_buf();
 			v_utils::log!("Using vision document: {}", vision_path.display());
 
-			let result = generate_wallpaper(&vision_path, &config, true);
+			let result = generate_until_fresh(&vision_path, &config, true);
 
 			// Remove lock
 			remove_lock()?;
