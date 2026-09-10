@@ -184,13 +184,14 @@ fn parse_forbes(raw: &[u8]) -> Result<Vec<Person>> {
 
 /// Spotlight on one billionaire, cached for the day so `circle` doesn't pay for a call per wallpaper switch.
 /// The cache is only ever overwritten by a successful call, so it doubles as the fallback when one fails.
-/// The flag is false when the text came out of an *expired* cache, which is the caller's cue to retry.
-fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<(String, bool)> {
+/// The text is `None` when the call failed with nothing cached to fall back on; the flag is whether a
+/// later attempt could still turn it fresh.
+fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<(Option<String>, bool)> {
 	let cache_path = v_utils::xdg_cache_file!("billionaire_blurb.txt");
 	if !reroll && cache_path.exists() {
 		let age = cache_path.metadata()?.modified()?.elapsed()?;
 		if age < BLURB_CACHE_TTL {
-			return Ok((std::fs::read_to_string(&cache_path)?, true));
+			return Ok((Some(std::fs::read_to_string(&cache_path)?), false));
 		}
 	}
 	let p = list.choose(&mut rand::rng()).context("Empty billionaire list")?;
@@ -212,14 +213,24 @@ fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<(String, bool)> {
 		Ok(response) => {
 			let blurb = response.text.trim().to_owned();
 			std::fs::write(&cache_path, &blurb)?;
-			Ok((blurb, true))
+			Ok((Some(blurb), false))
 		}
-		Err(e) if cache_path.exists() => {
-			warn!("Blurb call failed, reusing the expired one: {e}");
-			Ok((std::fs::read_to_string(&cache_path)?, false))
+		Err(e) => {
+			let retry = worth_retrying(&e);
+			let cached = cache_path.exists().then(|| std::fs::read_to_string(&cache_path)).transpose()?;
+			warn!("Blurb call failed: {:?}", miette::Report::new(e));
+			Ok((cached, retry))
 		}
-		Err(e) => Err(e),
 	}
+}
+
+/// Retrying a revoked key for two hours is the spam the backoff exists to avoid, so only the failures a
+/// later attempt could clear on its own ask for one.
+fn worth_retrying(e: &ask_llm::Error) -> bool {
+	matches!(
+		e,
+		ask_llm::Error::Transport(_) | ask_llm::Error::Api(ask_llm::Api::RateLimited { .. } | ask_llm::Api::Overloaded { .. })
+	)
 }
 
 fn billionaire_stats(list: &[Person], blurb: Option<String>) -> Vec<String> {
@@ -434,13 +445,13 @@ fn load_last_input() -> Result<PathBuf> {
 	Ok(PathBuf::from(content.trim()))
 }
 
-/// Renders the wallpaper unconditionally; returns whether every decoration on it is current.
+/// Renders the wallpaper unconditionally; returns whether a later attempt could still improve it.
 fn generate_wallpaper(input_path: &Path, config: &AppConfig, quote: &wallpaper_carousel::config::Quote, reroll: bool) -> Result<bool> {
 	info!("Starting wallpaper generation for: {}", input_path.display());
 	v_utils::elog!("Selected quote: {:?}", quote.text);
 	v_utils::elog!("Author: {:?}", quote.author);
 
-	let mut fresh = true;
+	let mut retry = false;
 	let mut stats: Vec<String> = Vec::new();
 
 	if let Some(balance) = &config.balance {
@@ -463,16 +474,16 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, quote: &wallpaper_c
 		// Forbes' endpoint intermittently stalls behind bot protection; a missing decoration must not cost us the wallpaper.
 		match billionaire_list() {
 			Ok(list) => {
-				let blurb = billionaire_blurb(&list, reroll).inspect_err(|e| warn!("Billionaire blurb failed: {e}")).ok(); // the count is worth rendering on its own
-				fresh = matches!(&blurb, Some((_, true)));
-				for line in billionaire_stats(&list, blurb.map(|(text, _)| text)) {
+				let (blurb, retry_blurb) = billionaire_blurb(&list, reroll)?; // the count is worth rendering on its own
+				retry = retry_blurb;
+				for line in billionaire_stats(&list, blurb) {
 					v_utils::elog!("{line}");
 					stats.push(line);
 				}
 			}
 			Err(e) => {
 				warn!("Billionaire list failed: {e}");
-				fresh = false;
+				retry = true;
 			}
 		}
 	}
@@ -530,14 +541,14 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, quote: &wallpaper_c
 
 	v_utils::log!("Wallpaper set to {}", output_path.display());
 
-	Ok(fresh)
+	Ok(retry)
 }
 
 /// The quote is picked once, so a retry only swaps in the data that was missing.
 fn generate_until_fresh(input_path: &Path, config: &AppConfig, reroll: bool) -> Result<()> {
 	let quote = config.quotes.choose(&mut rand::rng()).context("No quotes configured")?;
 	let mut backoff = RETRY_BACKOFF_START;
-	while !generate_wallpaper(input_path, config, quote, reroll)? {
+	while generate_wallpaper(input_path, config, quote, reroll)? {
 		if backoff > RETRY_BACKOFF_CAP {
 			warn!("Giving up on refreshing the wallpaper; it stays on the last cached data");
 			break;
