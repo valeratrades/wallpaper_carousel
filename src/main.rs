@@ -9,7 +9,7 @@ use color_eyre::{
 	Result,
 	eyre::{Context, ContextCompat, bail, ensure},
 };
-use rand::prelude::IndexedRandom;
+use rand::prelude::{IndexedRandom, IteratorRandom};
 use serde::Deserialize;
 use tracing::{info, warn};
 use v_utils::utils::eyre::exit_on_error;
@@ -194,9 +194,13 @@ fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<(Option<String>, b
 			return Ok((Some(std::fs::read_to_string(&cache_path)?), false));
 		}
 	}
-	let p = list.choose(&mut rand::rng()).context("Empty billionaire list")?;
+	let p = list
+		.iter()
+		.filter(|p| p.self_made == Some(true))
+		.choose(&mut rand::rng())
+		.context("No self-made billionaires in the list")?;
 	let prompt = format!(
-		"{name}. Net worth ${worth:.1}B. Country: {country}. Source: {source}. Industries: {industries}. Age: {age}. Self-made: {self_made}.\nForbes bios:\n{bios}\n\n\
+		"{name}. Net worth ${worth:.1}B. Country: {country}. Source: {source}. Industries: {industries}. Age: {age}.\nForbes bios:\n{bios}\n\n\
 		Write ~40 words on how this person built their fortune and what the business actually does. Only the money: drop hobbies, family, philanthropy, awards, residences, politics. \
 		Plain prose, no markdown, no preamble, lead with the name.",
 		name = p.person_name,
@@ -205,7 +209,6 @@ fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<(Option<String>, b
 		source = p.source.as_deref().unwrap_or("unknown"),
 		industries = p.industries.join(", "),
 		age = p.age.map(|a| a.to_string()).unwrap_or("unknown".to_owned()),
-		self_made = p.self_made.map(|s| s.to_string()).unwrap_or("unknown".to_owned()),
 		bios = p.bios.join("\n"),
 	);
 
