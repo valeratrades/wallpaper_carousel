@@ -202,7 +202,7 @@ fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<(Option<String>, b
 	let prompt = format!(
 		"{name}. Net worth ${worth:.1}B. Country: {country}. Source: {source}. Industries: {industries}. Age: {age}.\nForbes bios:\n{bios}\n\n\
 		Write ~40 words on how this person built their fortune and what the business actually does. Only the money: drop hobbies, family, philanthropy, awards, residences, politics. \
-		Plain prose, no markdown, no preamble, lead with the name.",
+		Plain prose, no markdown, no preamble, open with exactly `{name} (${worth:.1}B)`.",
 		name = p.person_name,
 		worth = p.final_worth / 1000.,
 		country = p.country.as_deref().unwrap_or("unknown"),
