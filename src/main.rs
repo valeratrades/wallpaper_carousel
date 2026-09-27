@@ -219,21 +219,12 @@ fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<(Option<String>, b
 			Ok((Some(blurb), false))
 		}
 		Err(e) => {
-			let retry = worth_retrying(&e);
+			let retry = matches!(e, ask_llm::Error::Recoverable(_)); // retrying a revoked key for two hours is the spam the backoff exists to avoid
 			let cached = cache_path.exists().then(|| std::fs::read_to_string(&cache_path)).transpose()?;
 			warn!("Blurb call failed: {:?}", miette::Report::new(e));
 			Ok((cached, retry))
 		}
 	}
-}
-
-/// Retrying a revoked key for two hours is the spam the backoff exists to avoid, so only the failures a
-/// later attempt could clear on its own ask for one.
-fn worth_retrying(e: &ask_llm::Error) -> bool {
-	matches!(
-		e,
-		ask_llm::Error::Transport(_) | ask_llm::Error::Api(ask_llm::Api::RateLimited { .. } | ask_llm::Api::Overloaded { .. })
-	)
 }
 
 fn billionaire_stats(list: &[Person], blurb: Option<String>) -> Vec<String> {
