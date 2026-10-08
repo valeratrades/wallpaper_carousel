@@ -65,11 +65,7 @@ never sacrifices reputation, ruthless about defending it.
   // I think it's important to drive this as one of the invariants, as [you can't self-diagnose sleep debt](https://x.com/aakashgupta/status/2042720283447247121) /*[The Cumulative Cost of additional Wakefulness](https://academic.oup.com/sleep/article-abstract/26/2/117/2709164?redirectedFrom=fulltext&login=false#no-access-message)*/
 
 == fitness
-can do all of:
-- planche
-- front-lever
-- 1+ one-arm pull-up on each hand
-- hand-stand pushups
+can do all of: {planche, front-lever, 1-arm muscle-up each hand} // 1-arm muscle-up is a superset of {one-arm pull-ups + hand-stand pushups} which were in its place before
 
 // additional indicators of fitness could be: {visible abs, bicep vein, etc}, but I'm pretty sure the perf-based metrics above already force all the cosmetics in order; while also being actionable.
 
