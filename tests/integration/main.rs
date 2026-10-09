@@ -24,6 +24,7 @@ fn render_pages(name: &str, overlay: serde_json::Value) -> usize {
 
 fn payload(stats: serde_json::Value) -> serde_json::Value {
 	serde_json::json!({
+		"today": "2026-10-09",
 		"quote": "good intentions don't work\nmechanisms do.",
 		"author": "Jeff Bezos",
 		"stats": stats,

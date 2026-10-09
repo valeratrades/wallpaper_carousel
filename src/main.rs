@@ -504,7 +504,12 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, quote: &wallpaper_c
 		(safe_area.width * safe_area.height) as f32 / (display_width * display_height) as f32 * 100.0
 	);
 
+	// typst's `datetime.today()` honours `SOURCE_DATE_EPOCH`, which nix pins to 1980
+	let today = ProcessCommand::new("date").arg("+%F").output()?;
+	ensure!(today.status.success(), "date failed: {}", String::from_utf8_lossy(&today.stderr));
+
 	let mut overlay = serde_json::json!({
+		"today": String::from_utf8(today.stdout)?.trim(),
 		"quote": quote.text,
 		"author": quote.author,
 		"stats": stats,

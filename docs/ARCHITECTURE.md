@@ -1,7 +1,7 @@
 # Architecture
 
 Renders a wallpaper: a background (the vision document, or an arbitrary photo) with a quote,
-a balance readout and billionaire trivia laid over it, then hands it to sway.
+a balance readout, billionaire trivia and a year-progress bar laid over it, then hands it to sway.
 
 ```mermaid
 flowchart LR

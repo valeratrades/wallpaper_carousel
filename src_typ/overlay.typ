@@ -29,6 +29,18 @@
   lines.enumerate().map(p => stacked(..p)).join()
 }
 
+#let _year-progress(iso) = {
+  let (y, m, d) = iso.split("-").map(int)
+  let today = datetime(year: y, month: m, day: d)
+  let total = datetime(year: today.year(), month: 12, day: 31).ordinal()
+  let bar = 240pt
+  box(width: bar, height: 6pt, radius: 3pt, fill: white.transparentize(70%), clip: true, align(left,
+    box(width: bar * today.ordinal() / total, height: 100%, fill: white),
+  ))
+  h(10pt)
+  str(total - today.ordinal()) + "d left"
+}
+
 #let overlay() = align(right)[
   // `FillLevels` is named explicitly: several installed fonts claim the same private-use block, and automatic fallback picks among them per run
   #set text(font: ("DejaVu Sans Mono", "FillLevels"), fill: white)
@@ -40,5 +52,9 @@
   }
   #for stat in data.at("stats", default: ()) {
     block(above: 20pt, text(size: 20pt, _lines(stat)))
+  }
+  #let today = data.at("today", default: none)
+  #if today != none {
+    block(above: 20pt, text(size: 20pt, _year-progress(today)))
   }
 ]
