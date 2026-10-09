@@ -14,10 +14,18 @@ pub struct AppConfig {
 	/// Render the count of billionaires worldwide, plus a paragraph on how a random one of them made their money.
 	#[serde(default = "yes")]
 	pub billionaires: bool,
+	/// Bar of the year passed, plus the days left in it.
+	#[serde(default)]
+	pub year_progress: Toggle,
 	/// Breathing room between the text and the edge of the safe area, in pt of a 1920pt-wide page.
 	pub edge_padding: Option<u32>,
 	/// Path to the typst (`.typ`) document compiled into the generated wallpaper. `overlay.typ` and `photo.typ` are looked up next to it.
 	pub vision_source: ExpandedPath,
+}
+/// nix-style `<feature>.enable`; off unless set, like `mkEnableOption`.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct Toggle {
+	pub enable: bool,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Balance {

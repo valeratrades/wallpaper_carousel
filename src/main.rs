@@ -504,12 +504,7 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, quote: &wallpaper_c
 		(safe_area.width * safe_area.height) as f32 / (display_width * display_height) as f32 * 100.0
 	);
 
-	// typst's `datetime.today()` honours `SOURCE_DATE_EPOCH`, which nix pins to 1980
-	let today = ProcessCommand::new("date").arg("+%F").output()?;
-	ensure!(today.status.success(), "date failed: {}", String::from_utf8_lossy(&today.stderr));
-
 	let mut overlay = serde_json::json!({
-		"today": String::from_utf8(today.stdout)?.trim(),
 		"quote": quote.text,
 		"author": quote.author,
 		"stats": stats,
@@ -522,6 +517,13 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, quote: &wallpaper_c
 			"right": to_pt(display_width - safe_area.x - safe_area.width) + padding,
 		},
 	});
+
+	if config.year_progress.enable {
+		// typst's `datetime.today()` honours `SOURCE_DATE_EPOCH`, which nix pins to 1980
+		let today = ProcessCommand::new("date").arg("+%F").output()?;
+		ensure!(today.status.success(), "date failed: {}", String::from_utf8_lossy(&today.stderr));
+		overlay["today"] = serde_json::json!(String::from_utf8(today.stdout)?.trim());
+	}
 
 	// A `.typ` input is the vision document itself; anything else is a photo we hand to `photo.typ` as a background.
 	let doc = match input_path.extension().is_some_and(|e| e == "typ") {

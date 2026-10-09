@@ -38,7 +38,7 @@
     box(width: bar * today.ordinal() / total, height: 100%, fill: white),
   ))
   h(10pt)
-  str(total - today.ordinal()) + "d left"
+  str(total - today.ordinal()) + "d till EOY"
 }
 
 #let overlay() = align(right)[
