@@ -1,4 +1,4 @@
-#import "overlay.typ": data, inset, overlay, page-size
+#import "@local/wallpaper-carousel:0.1.0": data, inset, overlay, page-size
 
 #set page(
   width: page-size.width,

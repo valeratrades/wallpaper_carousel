@@ -37,7 +37,7 @@ enum Command {
 		input: Option<PathBuf>,
 	},
 
-	/// Generate wallpaper using the bundled vision document
+	/// Generate wallpaper from the `vision_source` document
 	Generate,
 
 	/// Circle through images in the same directory
@@ -248,8 +248,11 @@ fn get_supported_image_extensions() -> Vec<&'static str> {
 
 /// `--root /` so `photo.typ` can read a background from anywhere on disk. `output{n}.png` lets us
 /// detect multi-page documents, which mean the overlay no longer fits and we refuse to render.
-fn compile_wallpaper(doc: &Path, overlay: &serde_json::Value, ppi: f32) -> Result<PathBuf> {
-	ensure!(doc.exists(), "Typst document does not exist: {}", doc.display());
+/// `None` renders the embedded `photo.typ`, fed to typst over stdin.
+fn compile_wallpaper(doc: Option<&Path>, overlay: &serde_json::Value, ppi: f32) -> Result<PathBuf> {
+	if let Some(doc) = doc {
+		ensure!(doc.exists(), "Typst document does not exist: {}", doc.display());
+	}
 	let output_path = v_utils::xdg_state_file!("extended.png");
 	let stem = output_path.with_extension("");
 	let page = |n: u8| PathBuf::from(format!("{}{n}.png", stem.display()));
@@ -259,17 +262,27 @@ fn compile_wallpaper(doc: &Path, overlay: &serde_json::Value, ppi: f32) -> Resul
 		}
 	}
 
-	let output = ProcessCommand::new("typst")
+	let mut typst = ProcessCommand::new("typst")
 		.args(["compile", "--format", "png", "--root", "/", "--ppi"])
 		.arg(ppi.to_string())
 		.arg("--input")
 		.arg(format!("overlay={overlay}"))
-		.arg(doc)
+		.arg(doc.map_or("-".as_ref(), Path::as_os_str))
 		.arg(format!("{}{{n}}.png", stem.display()))
-		.output()
+		.stdin(std::process::Stdio::piped())
+		.stdout(std::process::Stdio::piped())
+		.stderr(std::process::Stdio::piped())
+		.spawn()
 		.wrap_err("Failed to run typst")?;
-	ensure!(output.status.success(), "typst compilation failed:\n{}", String::from_utf8_lossy(&output.stderr));
-	ensure!(!page(2).exists(), "{} rendered more than 1 page: the overlay no longer fits", doc.display());
+	let mut stdin = typst.stdin.take().expect("piped above");
+	if doc.is_none() {
+		std::io::Write::write_all(&mut stdin, include_bytes!("photo.typ"))?;
+	}
+	drop(stdin);
+	let output = typst.wait_with_output()?;
+	let name = doc.map_or_else(|| "photo.typ".to_owned(), |d| d.display().to_string());
+	ensure!(output.status.success(), "typst compilation of {name} failed:\n{}", String::from_utf8_lossy(&output.stderr));
+	ensure!(!page(2).exists(), "{name} rendered more than 1 page: the overlay no longer fits");
 
 	std::fs::rename(page(1), &output_path)?;
 	Ok(output_path)
@@ -527,14 +540,14 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, quote: &wallpaper_c
 
 	// A `.typ` input is the vision document itself; anything else is a photo we hand to `photo.typ` as a background.
 	let doc = match input_path.extension().is_some_and(|e| e == "typ") {
-		true => input_path.to_owned(),
+		true => Some(input_path),
 		false => {
 			overlay["bg"] = serde_json::json!(std::fs::canonicalize(input_path)?); // typst resolves it against `--root /`
-			config.vision_source.as_ref().parent().context("Vision source has no parent directory")?.join("photo.typ")
+			None
 		}
 	};
 
-	let output_path = compile_wallpaper(&doc, &overlay, 72. * display_width as f32 / PAGE_WIDTH as f32)?;
+	let output_path = compile_wallpaper(doc, &overlay, 72. * display_width as f32 / PAGE_WIDTH as f32)?;
 
 	ProcessCommand::new("swaymsg")
 		.args(["output", "*", "background", output_path.to_str().unwrap(), "fill"])

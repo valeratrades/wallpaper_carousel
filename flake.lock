@@ -315,8 +315,7 @@
     },
     "root": {
       "inputs": {
-        "v_flakes": "v_flakes",
-        "wrap-it": "wrap-it"
+        "v_flakes": "v_flakes"
       }
     },
     "rust-overlay": {
@@ -378,23 +377,6 @@
         "owner": "valeratrades",
         "ref": "v1.6",
         "repo": "v_flakes",
-        "type": "github"
-      }
-    },
-    "wrap-it": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1765366157,
-        "narHash": "sha256-dwTtL/++Vdnmn+E3iyLuMaptTjTfBNfyvJ4Cl+dn1rY=",
-        "owner": "valeratrades",
-        "repo": "wrap-it",
-        "rev": "cf3de8ced50c353ccfd534f3bb1ae9f6d5a04788",
-        "type": "github"
-      },
-      "original": {
-        "owner": "valeratrades",
-        "repo": "wrap-it",
-        "rev": "cf3de8ced50c353ccfd534f3bb1ae9f6d5a04788",
         "type": "github"
       }
     }

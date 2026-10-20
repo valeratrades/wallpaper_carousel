@@ -1,8 +1,14 @@
 cargo-features = ["codegen-backend"]
 [package]
 name = "wallpaper_carousel"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
+authors = ["Valeriy Sakharov <valeratrades@gmail.com>"]
+description = "Render a typst document or a photo with a quote, balance and trivia overlay, and set it as the sway wallpaper"
+license = "GLWTPL"
+repository = "https://github.com/valeratrades/wallpaper_carousel"
+keywords = ["wallpaper", "sway", "typst"]
+categories = ["command-line-utilities"]
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]

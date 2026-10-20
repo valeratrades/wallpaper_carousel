@@ -9,7 +9,7 @@ flowchart LR
     F["Forbes list + LLM blurb<br/>(cached)"] --> P
     D["swaymsg: display modes"] --> P
     P["main.rs: overlay payload (JSON)"] -->|--input overlay=| T
-    V["vision.typ / photo.typ<br/>+ overlay.typ"] --> T
+    V["vision_source / photo.typ<br/>+ @local/wallpaper-carousel"] --> T
     T["typst compile --format png"] --> W["extended.png"] --> S["swaymsg output * background"]
 ```
 
@@ -19,9 +19,14 @@ flowchart LR
 serializes it, invokes `typst`, sets the wallpaper. `compile_wallpaper` is the only place that
 shells out to typst.
 
-**`src_typ/`** — layout. `overlay.typ` decodes the payload and exports `overlay()`, `page-size`
-and `inset`; `vision.typ` is the goal document with `overlay()` appended to its flow;
-`photo.typ` is a bare page with a photo background and the overlay placed top-right.
+**`src_typ/`** — layout, shipped as the typst package `@local/wallpaper-carousel`. `overlay.typ`
+decodes the payload and exports `overlay()`, `page-size` and `inset`.
+
+**`src/photo.typ`** — embedded in the binary and fed to typst over stdin: a bare page with a photo
+background and the overlay placed top-right.
+
+The vision document is not part of the repo: `vision_source` points at a user-owned `.typ` that
+imports the package and appends `overlay()` to its flow (`examples/vision.typ`).
 
 ## Invariants
 
@@ -47,7 +52,7 @@ and `inset`; `vision.typ` is the goal document with `overlay()` appended to its 
 ┌─ page: 1920pt × display ratio ────────────────┐
 │ safe-area inset (0 when all displays agree)   │
 │  ┌─ + edge_padding ────────────────────────┐  │
-│  │  vision.typ: 2 columns, 13pt   overlay()│  │
+│  │  vision_source: own layout     overlay()│  │
 │  └─────────────────────────────────────────┘  │
 └───────────────────────────────────────────────┘
 ```

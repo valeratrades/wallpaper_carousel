@@ -19,7 +19,7 @@ pub struct AppConfig {
 	pub year_progress: Toggle,
 	/// Breathing room between the text and the edge of the safe area, in pt of a 1920pt-wide page.
 	pub edge_padding: Option<u32>,
-	/// Path to the typst (`.typ`) document compiled into the generated wallpaper. `overlay.typ` and `photo.typ` are looked up next to it.
+	/// Path to the typst (`.typ`) document compiled into the generated wallpaper. It renders the overlay by importing `@local/wallpaper-carousel:0.1.0`.
 	pub vision_source: ExpandedPath,
 }
 /// nix-style `<feature>.enable`; off unless set, like `mkEnableOption`.

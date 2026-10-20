@@ -2,7 +2,7 @@
 
 use std::{path::PathBuf, process::Command};
 
-/// Number of pages `vision.typ` renders for the given overlay payload.
+/// Number of pages `examples/vision.typ` renders for the given overlay payload.
 fn render_pages(name: &str, overlay: serde_json::Value) -> usize {
 	let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 	let stem = std::env::temp_dir().join(format!("wallpaper_carousel_{name}"));
@@ -13,7 +13,7 @@ fn render_pages(name: &str, overlay: serde_json::Value) -> usize {
 	let out = Command::new("typst")
 		.args(["compile", "--format", "png", "--root", "/", "--ppi", "72", "--input"])
 		.arg(format!("overlay={overlay}"))
-		.arg(root.join("src_typ/vision.typ"))
+		.arg(root.join("examples/vision.typ"))
 		.arg(format!("{}{{n}}.png", stem.display()))
 		.output()
 		.expect("typst on PATH");

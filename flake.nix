@@ -1,12 +1,8 @@
 {
   inputs = {
     v_flakes.url = "github:valeratrades/v_flakes?ref=v1.6";
-    wrap-it = {
-      url = "github:valeratrades/wrap-it/cf3de8ced50c353ccfd534f3bb1ae9f6d5a04788";
-      flake = false;
-    };
   };
-  outputs = { self, v_flakes, wrap-it }:
+  outputs = { self, v_flakes }:
     let
       inherit (v_flakes) flake-utils pre-commit-hooks;
     in
@@ -21,9 +17,10 @@
           pname = manifest.name;
           stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
 
+          # documents rendered by the tool import `overlay.typ` as `@local/wallpaper-carousel`
           typstPackages = pkgs.runCommand "typst-packages" { } ''
-            mkdir -p $out/local/wrap-it
-            ln -s ${wrap-it} $out/local/wrap-it/0.1.1
+            mkdir -p $out/local/wallpaper-carousel
+            ln -s ${./src_typ} $out/local/wallpaper-carousel/0.1.0
           '';
 
           rs = v_flakes.rs {
@@ -34,6 +31,7 @@
             enable = true;
             lastSupportedVersion = "nightly-2026-06-29";
             jobs.default = true;
+            publishCachix = "valeratrades";
           };
           readme = v_flakes.readme-fw {
             inherit pkgs pname;
@@ -53,29 +51,6 @@
                 inherit rustc cargo stdenv;
               };
 
-              visionDocument = pkgs.stdenvNoCC.mkDerivation {
-                name = "vision-document";
-                src = ./.;
-
-                nativeBuildInputs = [ pkgs.typst ];
-
-                buildPhase = ''
-                  export TYPST_PACKAGE_PATH=${typstPackages}
-                  typst compile src_typ/vision.typ output.pdf
-                  typst compile --format png src_typ/vision.typ output{n}.png
-                  if [ -f output2.png ]; then
-                    echo "Error: More than 1 page generated. Vision document must be single-page."
-                    exit 1
-                  fi
-                  mv output1.png output.png
-                '';
-
-                installPhase = ''
-                  mkdir -p $out
-                  cp output.pdf $out/
-                  cp output.png $out/
-                '';
-              };
             in
             {
               default = rustPlatform.buildRustPackage rec {
@@ -83,7 +58,7 @@
                 version = manifest.version;
 
                 buildInputs = with pkgs; [ openssl.dev ];
-                nativeBuildInputs = with pkgs; [ pkg-config makeWrapper typst ]; # the integration test compiles `vision.typ`
+                nativeBuildInputs = with pkgs; [ pkg-config makeWrapper typst ]; # the integration test compiles `examples/vision.typ`
 
                 TYPST_PACKAGE_PATH = "${typstPackages}";
                 TYPST_FONT_PATHS = "${pkgs.dejavu_fonts}/share/fonts/truetype";
@@ -103,14 +78,19 @@
                 '';
               };
 
-              vision = visionDocument;
+              typst-packages = typstPackages;
             };
 
           devShells.default =
             with pkgs;
             mkShell {
               inherit stdenv;
-              shellHook = pre-commit-check.shellHook + combined.shellHook;
+              # live `src_typ/` rather than its store copy, so edits to the overlay show up without re-entering the shell
+              shellHook = pre-commit-check.shellHook + combined.shellHook + ''
+                mkdir -p target/typst-packages/local/wallpaper-carousel
+                ln -sfn "$PWD/src_typ" target/typst-packages/local/wallpaper-carousel/0.1.0
+                export TYPST_PACKAGE_PATH="$PWD/target/typst-packages"
+              '';
 
               packages = [
                 mold
@@ -123,7 +103,6 @@
 
               env.RUST_BACKTRACE = 1;
               env.RUST_LIB_BACKTRACE = 0;
-              env.TYPST_PACKAGE_PATH = "${typstPackages}";
             };
         }
       ) // {
