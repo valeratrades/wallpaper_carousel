@@ -37,7 +37,7 @@
             inherit pkgs pname;
             lastSupportedVersion = "nightly-1.93";
             rootDir = ./.;
-            licenses = [{ license = v_flakes.files.licenses.nsfw; }];
+            licenses = [{ license = v_flakes.files.licenses.gl; }];
             badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ];
           };
           combined = v_flakes.utils.combine { inherit rust; modules = [ readme github rs ]; };
@@ -45,10 +45,11 @@
         {
           packages =
             let
-              rustc = rust;
-              cargo = rust;
+              build_rust = v_flakes.rs.build_nightly system;
               rustPlatform = pkgs.makeRustPlatform {
-                inherit rustc cargo stdenv;
+                inherit stdenv;
+                rustc = build_rust;
+                cargo = build_rust;
               };
 
             in
