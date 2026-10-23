@@ -6,7 +6,7 @@ a balance readout, billionaire trivia and a year-progress bar laid over it, then
 ```mermaid
 flowchart LR
     Q["config: quotes, balance cmd"] --> P
-    F["Forbes list + LLM blurb<br/>(cached)"] --> P
+    F["Forbes list + LLM blurb + photo<br/>(cached)"] --> P
     D["swaymsg: display modes"] --> P
     P["main.rs: overlay payload (JSON)"] -->|--input overlay=| T
     V["vision_source / photo.typ<br/>+ @local/wallpaper-carousel"] --> T
@@ -37,9 +37,9 @@ imports the package and appends `overlay()` to its flow (`examples/vision.typ`).
   no configuration in which it silently covers something.
 - **One payload, one hand-off.** Everything typst needs arrives as a single `--input overlay=<json>`.
   Adding an information source is a new JSON field, never a new file or a new argument.
-- **A decoration must never cost the wallpaper.** Forbes and the LLM blurb are best-effort — they
-  fall back to their cache, and a render that used an expired one re-renders on exponential backoff
-  until the network returns. Only a failure a later attempt could clear on its own buys a retry — a
+- **A decoration must never cost the wallpaper.** Forbes, the LLM blurb and the photo are best-effort — they
+  fall back to their cache (the photo to none), and a render that used an expired one re-renders on
+  exponential backoff until the network returns. Only a failure a later attempt could clear on its own buys a retry — a
   revoked key or a retired model gives up at once. Every other failure aborts the run rather than
   rendering something wrong.
 - **The page is 1920pt wide, always.** Height follows the display's aspect ratio and `--ppi` scales

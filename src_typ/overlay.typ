@@ -29,6 +29,10 @@
   lines.enumerate().map(p => stacked(..p)).join()
 }
 
+#let _hex-byte = range(256).map(b => ((if b < 16 { "0" } else { "" }) + str(b, base: 16), b)).to-dict()
+// a package can't read files outside its own dir, so the photo travels hex-encoded inside the payload
+#let _unhex(s) = bytes(range(0, s.len(), step: 2).map(i => _hex-byte.at(s.slice(i, i + 2))))
+
 #let _year-progress(iso) = {
   let (y, m, d) = iso.split("-").map(int)
   let today = datetime(year: y, month: m, day: d)
@@ -52,6 +56,13 @@
   }
   #for stat in data.at("stats", default: ()) {
     block(above: 20pt, text(size: 20pt, _lines(stat)))
+  }
+  #let spotlight = data.at("spotlight", default: none)
+  #if spotlight != none {
+    let blurb = text(size: 20pt, _lines(spotlight.blurb))
+    block(above: 20pt, if spotlight.photo == none { blurb } else {
+      grid(columns: (1fr, auto), column-gutter: 20pt, align: top, blurb, image(_unhex(spotlight.photo), height: 140pt))
+    })
   }
   #let today = data.at("today", default: none)
   #if today != none {

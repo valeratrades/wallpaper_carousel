@@ -2,6 +2,8 @@
 
 use std::{path::PathBuf, process::Command};
 
+/// 3×4 solid grey
+const PHOTO_HEX: &str = "89504e470d0a1a0a0000000d4948445200000003000000040802000000c44f12500000000e4944415478da6368800106bc2c006837120100958b970000000049454e44ae426082";
 /// Number of pages `examples/vision.typ` renders for the given overlay payload.
 fn render_pages(name: &str, overlay: serde_json::Value) -> usize {
 	let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -39,7 +41,9 @@ fn payload(stats: serde_json::Value) -> serde_json::Value {
 fn vision_fits_one_page() {
 	let blurb = "Sergei Kolesnikov co-founded Technonicol in 1992 with Igor Rybakov, building a global manufacturing company producing roofing, waterproofing, \
 		and thermal insulation materials. Operating 72 factories across Europe and Asia, Kolesnikov owns 50% of the enterprise.";
-	assert_eq!(render_pages("fits", payload(serde_json::json!(["balance\n$1,234.56", "3428 billionaires", blurb]))), 1);
+	let mut overlay = payload(serde_json::json!(["balance\n$1,234.56", "3428 billionaires"]));
+	overlay["spotlight"] = serde_json::json!({ "blurb": blurb, "photo": PHOTO_HEX });
+	assert_eq!(render_pages("fits", overlay), 1);
 }
 
 #[test]

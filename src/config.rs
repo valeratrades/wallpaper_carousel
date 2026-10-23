@@ -11,7 +11,7 @@ use v_utils::{
 pub struct AppConfig {
 	pub quotes: Vec<Quote>,
 	pub balance: Option<Balance>,
-	/// Render the count of billionaires worldwide, plus a paragraph on how a random one of them made their money.
+	/// Render the count of billionaires worldwide, plus a paragraph on how a random one of them made their money, and their photo.
 	#[serde(default = "yes")]
 	pub billionaires: bool,
 	/// Bar of the year passed, plus the days left in it.

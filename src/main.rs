@@ -10,13 +10,15 @@ use color_eyre::{
 	eyre::{Context, ContextCompat, bail, ensure},
 };
 use rand::prelude::{IndexedRandom, IteratorRandom};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use v_utils::utils::eyre::exit_on_error;
 use wallpaper_carousel::config::{AppConfig, SettingsFlags};
 
 const BILLIONAIRE_CACHE_TTL: std::time::Duration = std::time::Duration::from_weeks(1);
 const BLURB_CACHE_TTL: std::time::Duration = std::time::Duration::from_days(1);
+/// the photo rides in argv, where one entry caps at 128 KiB (MAX_ARG_STRLEN) and hex doubles it
+const PHOTO_MAX_BYTES: usize = 48 * 1024;
 /// sway starts us before the link is up, so the first render routinely lands on a stale cache
 const RETRY_BACKOFF_START: std::time::Duration = std::time::Duration::from_secs(30);
 const RETRY_BACKOFF_CAP: std::time::Duration = std::time::Duration::from_secs(3600);
@@ -131,7 +133,10 @@ fn billionaire_list() -> Result<Vec<Person>> {
 		.trim()
 		.parse()?;
 	let fresh = resolve_list(year, |y| {
-		let raw = fetch_forbes(y)?;
+		let raw = curl(
+			&format!("https://www.forbes.com/forbesapi/person/billionaires/{y}/position/true.json?fields=rank,personName,finalWorth,country,source,industries,age,selfMade,bios&limit=4000"),
+			&[],
+		)?;
 		let list = parse_forbes(&raw)?;
 		if !list.is_empty() {
 			std::fs::write(&cache_path, &raw)?;
@@ -156,20 +161,13 @@ fn resolve_list(year: u32, fetch: impl Fn(u32) -> Result<Vec<Person>>) -> Result
 	Ok(list)
 }
 
-fn fetch_forbes(year: u32) -> Result<Vec<u8>> {
-	let output = ProcessCommand::new("curl")
-		.args([
-			"-sS",
-			"--max-time",
-			"15",
-			"-A",
-			"Mozilla/5.0",
-			&format!(
-				"https://www.forbes.com/forbesapi/person/billionaires/{year}/position/true.json?fields=rank,personName,finalWorth,country,source,industries,age,selfMade,bios&limit=4000"
-			),
-		])
-		.output()
-		.wrap_err("Failed to run curl")?;
+fn curl(url: &str, query: &[(&str, &str)]) -> Result<Vec<u8>> {
+	let mut cmd = ProcessCommand::new("curl");
+	cmd.args(["-sS", "--max-time", "15", "-A", "Mozilla/5.0", "-G"]);
+	for (k, v) in query {
+		cmd.arg("--data-urlencode").arg(format!("{k}={v}"));
+	}
+	let output = cmd.arg(url).output().wrap_err("Failed to run curl")?;
 
 	if !output.status.success() {
 		bail!("curl failed: {}", String::from_utf8_lossy(&output.stderr));
@@ -184,14 +182,15 @@ fn parse_forbes(raw: &[u8]) -> Result<Vec<Person>> {
 
 /// Spotlight on one billionaire, cached for the day so `circle` doesn't pay for a call per wallpaper switch.
 /// The cache is only ever overwritten by a successful call, so it doubles as the fallback when one fails.
-/// The text is `None` when the call failed with nothing cached to fall back on; the flag is whether a
+/// It is `None` when the call failed with nothing cached to fall back on; the flag is whether a
 /// later attempt could still turn it fresh.
-fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<(Option<String>, bool)> {
-	let cache_path = v_utils::xdg_cache_file!("billionaire_blurb.txt");
+fn billionaire_spotlight(list: &[Person], reroll: bool) -> Result<(Option<Spotlight>, bool)> {
+	let cache_path = v_utils::xdg_cache_file!("billionaire_spotlight.json");
+	let cached = || -> Result<Spotlight> { Ok(serde_json::from_slice(&std::fs::read(&cache_path)?)?) };
 	if !reroll && cache_path.exists() {
 		let age = cache_path.metadata()?.modified()?.elapsed()?;
 		if age < BLURB_CACHE_TTL {
-			return Ok((Some(std::fs::read_to_string(&cache_path)?), false));
+			return Ok((Some(cached()?), false));
 		}
 	}
 	let p = list
@@ -214,23 +213,143 @@ fn billionaire_blurb(list: &[Person], reroll: bool) -> Result<(Option<String>, b
 
 	match tokio::runtime::Runtime::new()?.block_on(ask_llm::Client::default().model(ask_llm::Model::Fast).max_tokens(200).ask(prompt)) {
 		Ok(response) => {
-			let blurb = response.text.trim().to_owned();
-			std::fs::write(&cache_path, &blurb)?;
-			Ok((Some(blurb), false))
+			let spotlight = Spotlight {
+				name: p.person_name.clone(),
+				blurb: response.text.trim().to_owned(),
+			};
+			let photo_path = v_utils::xdg_cache_file!("billionaire_photo");
+			if photo_path.exists() {
+				std::fs::remove_file(&photo_path)?; // before the JSON, so a photo on disk always belongs to the cached spotlight
+			}
+			std::fs::write(&cache_path, serde_json::to_vec(&spotlight)?)?;
+			Ok((Some(spotlight), false))
 		}
 		Err(e) => {
 			let retry = matches!(e, ask_llm::Error::Recoverable(_)); // retrying a revoked key for two hours is the spam the backoff exists to avoid
-			let cached = cache_path.exists().then(|| std::fs::read_to_string(&cache_path)).transpose()?;
+			let cached = cache_path.exists().then(cached).transpose()?;
 			warn!("Blurb call failed: {:?}", miette::Report::new(e));
 			Ok((cached, retry))
 		}
 	}
 }
 
-fn billionaire_stats(list: &[Person], blurb: Option<String>) -> Vec<String> {
-	let mut stats = vec![format!("{} billionaires", list.len())];
-	stats.extend(blurb);
-	stats
+#[derive(Debug, Deserialize, Serialize)]
+struct Spotlight {
+	name: String,
+	blurb: String,
+}
+
+/// Wikipedia's lead image when an article carries the exact name, else Bing's first portrait that names them.
+/// Cached until the spotlight rerolls; the flag is whether a later attempt could still find one.
+fn billionaire_photo(name: &str) -> Result<(Option<Vec<u8>>, bool)> {
+	let cache_path = v_utils::xdg_cache_file!("billionaire_photo");
+	if cache_path.exists() {
+		return Ok((Some(std::fs::read(&cache_path)?), false));
+	}
+	let name = name.trim_end_matches(" & family"); // Forbes' suffix for fortunes held jointly
+	let query = format!("{name} billionaire");
+	let lookup = || -> Result<Option<Vec<u8>>> {
+		let wikipedia = curl(
+			"https://en.wikipedia.org/w/api.php",
+			&[
+				("action", "query"),
+				("format", "json"),
+				("formatversion", "2"),
+				("generator", "search"),
+				("gsrsearch", &query),
+				("gsrlimit", "5"),
+				("prop", "pageimages"),
+				("piprop", "thumbnail"),
+				("pithumbsize", "300"),
+			],
+		)?;
+		let url = match wikipedia_photo_url(&wikipedia, name)? {
+			Some(url) => Some(url),
+			None => bing_photo_url(
+				&String::from_utf8(curl("https://www.bing.com/images/search", &[("q", &query), ("qft", "+filterui:face-face")])?)?,
+				name,
+			)?,
+		};
+		url.map(|url| curl(&url, &[])).transpose()
+	};
+	let photo = match lookup() {
+		Ok(Some(photo)) => photo,
+		Ok(None) => {
+			warn!("No photo of {name} found");
+			return Ok((None, false));
+		}
+		Err(e) => {
+			warn!("Photo lookup for {name} failed: {e}");
+			return Ok((None, true));
+		}
+	};
+	let is_image = [&b"\xFF\xD8\xFF"[..], b"\x89PNG", b"GIF8"].iter().any(|m| photo.starts_with(m)) || (photo.starts_with(b"RIFF") && photo.get(8..12) == Some(&b"WEBP"[..]));
+	if !is_image || photo.len() > PHOTO_MAX_BYTES {
+		warn!("Photo of {name} rejected: {} bytes, image: {is_image}", photo.len());
+		return Ok((None, false));
+	}
+	std::fs::write(&cache_path, &photo)?;
+	Ok((Some(photo), false))
+}
+
+#[derive(Debug, Deserialize)]
+struct WikiResponse {
+	/// absent when the search has no hits
+	query: Option<WikiQuery>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WikiQuery {
+	pages: Vec<WikiPage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WikiPage {
+	title: String,
+	/// search rank; pages come back in pageid order
+	index: u32,
+	thumbnail: Option<WikiThumbnail>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WikiThumbnail {
+	source: String,
+}
+
+/// Best-ranked hit titled exactly `name` (a ` (businessman)`-style disambiguator aside) that has an image.
+fn wikipedia_photo_url(raw: &[u8], name: &str) -> Result<Option<String>> {
+	let response: WikiResponse = serde_json::from_slice(raw).wrap_err("Wikipedia search schema changed")?;
+	let Some(query) = response.query else { return Ok(None) };
+	let mut pages = query.pages;
+	pages.sort_by_key(|p| p.index);
+	Ok(pages
+		.into_iter()
+		.filter(|p| p.title.split_once(" (").map_or(p.title.as_str(), |(base, _)| base).to_lowercase() == name.to_lowercase())
+		.find_map(|p| p.thumbnail)
+		.map(|t| t.source))
+}
+
+/// Bing serves unrelated images to clients it suspects of scraping, so a result must name the person in its title or page URL.
+fn bing_photo_url(html: &str, name: &str) -> Result<Option<String>> {
+	#[derive(Deserialize)]
+	struct Meta {
+		t: String,
+		purl: String,
+		turl: String,
+	}
+	let name = name.to_lowercase();
+	for result in html.split(r#"class="iusc""#).skip(1) {
+		let (m, _) = result
+			.split_once(r#" m=""#)
+			.and_then(|(_, m)| m.split_once('"'))
+			.context("Bing image result lost its `m` attribute")?;
+		let meta: Meta = serde_json::from_str(&m.replace("&quot;", "\"").replace("&amp;", "&")).wrap_err("Bing image result schema changed")?;
+		let haystack = format!("{} {}", meta.t, meta.purl).to_lowercase();
+		if name.split_whitespace().all(|w| haystack.contains(w)) {
+			return Ok(Some(meta.turl));
+		}
+	}
+	Ok(None)
 }
 
 fn get_cache_file_path() -> PathBuf {
@@ -460,6 +579,7 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, quote: &wallpaper_c
 
 	let mut retry = false;
 	let mut stats: Vec<String> = Vec::new();
+	let mut spotlight = None;
 
 	if let Some(balance) = &config.balance {
 		match balance.get_value() {
@@ -481,11 +601,19 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, quote: &wallpaper_c
 		// Forbes' endpoint intermittently stalls behind bot protection; a missing decoration must not cost us the wallpaper.
 		match billionaire_list() {
 			Ok(list) => {
-				let (blurb, retry_blurb) = billionaire_blurb(&list, reroll)?; // the count is worth rendering on its own
-				retry = retry_blurb;
-				for line in billionaire_stats(&list, blurb) {
-					v_utils::elog!("{line}");
-					stats.push(line);
+				let count = format!("{} billionaires", list.len());
+				v_utils::elog!("{count}");
+				stats.push(count);
+				let (pick, retry_spotlight) = billionaire_spotlight(&list, reroll)?;
+				retry = retry_spotlight;
+				if let Some(s) = pick {
+					v_utils::elog!("{}", s.blurb);
+					let (photo, retry_photo) = billionaire_photo(&s.name)?;
+					retry |= retry_photo;
+					spotlight = Some(serde_json::json!({
+						"blurb": s.blurb,
+						"photo": photo.map(|p| p.iter().map(|b| format!("{b:02x}")).collect::<String>()),
+					}));
 				}
 			}
 			Err(e) => {
@@ -530,6 +658,10 @@ fn generate_wallpaper(input_path: &Path, config: &AppConfig, quote: &wallpaper_c
 			"right": to_pt(display_width - safe_area.x - safe_area.width) + padding,
 		},
 	});
+
+	if let Some(s) = spotlight {
+		overlay["spotlight"] = s;
+	}
 
 	if config.year_progress.enable {
 		// typst's `datetime.today()` honours `SOURCE_DATE_EPOCH`, which nix pins to 1980
@@ -796,10 +928,38 @@ mod tests {
 		assert!(resolve_list(2026, |_| Ok(Vec::new())).is_err());
 	}
 
+	#[track_caller]
+	fn check_wikipedia(pages: &str, name: &str, expected: Option<&str>) {
+		let raw = format!(r#"{{"batchcomplete":true,"query":{{"pages":[{pages}]}}}}"#);
+		assert_eq!(wikipedia_photo_url(raw.as_bytes(), name).unwrap().as_deref(), expected);
+	}
+
 	#[test]
-	fn count_survives_a_missing_blurb() {
-		let list = parse_forbes(FIXTURE.as_bytes()).unwrap();
-		assert_eq!(billionaire_stats(&list, None), vec!["2 billionaires"]);
-		assert_eq!(billionaire_stats(&list, Some("a ".repeat(40).trim().to_owned()))[0], "2 billionaires");
+	fn wikipedia_photo_needs_the_exact_name() {
+		let homonym = r#"{"pageid":1,"ns":0,"title":"Jeff Green (businessman)","index":1,"thumbnail":{"source":"https://upload.wikimedia.org/green.jpg","width":300,"height":400}}"#;
+		let exact = r#"{"pageid":2,"ns":0,"title":"Jeff Greene","index":2,"thumbnail":{"source":"https://upload.wikimedia.org/greene.jpg","width":300,"height":400}}"#;
+		check_wikipedia(&format!("{exact},{homonym}"), "Jeff Greene", Some("https://upload.wikimedia.org/greene.jpg"));
+		check_wikipedia(homonym, "Jeff Greene", None);
+
+		let imageless = r#"{"pageid":3,"ns":0,"title":"Sergei Kolesnikov","index":1}"#;
+		let disambiguated =
+			r#"{"pageid":4,"ns":0,"title":"Sergei Kolesnikov (businessman)","index":2,"thumbnail":{"source":"https://upload.wikimedia.org/kolesnikov.jpg","width":300,"height":400}}"#;
+		check_wikipedia(&format!("{disambiguated},{imageless}"), "Sergei Kolesnikov", Some("https://upload.wikimedia.org/kolesnikov.jpg"));
+		check_wikipedia(imageless, "Sergei Kolesnikov", None);
+
+		assert_eq!(wikipedia_photo_url(br#"{"batchcomplete":true}"#, "Nobody").unwrap(), None);
+	}
+
+	#[test]
+	fn bing_photo_is_the_first_that_names_them() {
+		let html = r#"<a class="iusc" m="{&quot;t&quot;:&quot;Hot tags&quot;,&quot;purl&quot;:&quot;https://artovrag.com/2025/05/06/hot-tags-av4/&quot;,&quot;turl&quot;:&quot;https://ts1.mm.bing.net/th?id=junk&quot;}"></a>
+			<a class="iusc" style="height:180px;width:287px" m="{&quot;sid&quot;:&quot;&quot;,&quot;purl&quot;:&quot;https://www.cnbc.com/video/jeff-greene.html&quot;,&quot;murl&quot;:&quot;https://image.cnbcfm.com/api/v1/image/107293819.jpg?v=1693403891&amp;w=1920&amp;h=1080&quot;,&quot;turl&quot;:&quot;https://ts1.mm.bing.net/th?id=OIP.82ZcXvLcmwdljVXxdKKR8gHaEK&amp;pid=15.1&quot;,&quot;t&quot;:&quot;Watch CNBC&#39;s full interview with billionaire Jeff ...&quot;}" data-idpos="0,90" href="/images/search?view=detailV2"></a>
+			<a class="iusc" m="{&quot;t&quot;:&quot;Jeff Greene&quot;,&quot;purl&quot;:&quot;https://example.com/&quot;,&quot;turl&quot;:&quot;https://ts2.mm.bing.net/th?id=second&quot;}"></a>"#;
+		assert_eq!(
+			bing_photo_url(html, "Jeff Greene").unwrap().as_deref(),
+			Some("https://ts1.mm.bing.net/th?id=OIP.82ZcXvLcmwdljVXxdKKR8gHaEK&pid=15.1")
+		);
+		assert_eq!(bing_photo_url(html, "Alan Howard").unwrap(), None);
+		assert_eq!(bing_photo_url("<html>no results</html>", "Jeff Greene").unwrap(), None);
 	}
 }
