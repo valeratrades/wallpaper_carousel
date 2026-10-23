@@ -9,6 +9,7 @@ license = "GLWTPL"
 repository = "https://github.com/valeratrades/wallpaper_carousel"
 keywords = ["wallpaper", "sway", "typst"]
 categories = ["command-line-utilities"]
+include = ["src/**/*", "LICENSE", "README.md", ".cargo/*", "build.rs"]
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
