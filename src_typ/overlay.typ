@@ -19,15 +19,8 @@
 #let _chart-row(line) = line != "" and line.codepoints().all(c => str.to-unicode(c) >= 0xF09E5)
 
 // quotes in the config are hand-wrapped
-#let _lines(s) = {
-  let lines = s.split("\n")
-  // chart glyphs span the whole ascender-to-descender box, so any leading between rows tears the chart apart
-  let stacked(i, line) = context block(
-    spacing: if i > 0 and _chart-row(line) and _chart-row(lines.at(i - 1)) { 0pt } else { par.leading },
-    line,
-  )
-  lines.enumerate().map(p => stacked(..p)).join()
-}
+// chart glyphs span the whole ascender-to-descender box, so any leading between rows tears the chart apart
+#let _lines(s) = s.split("\n").map(line => context block(spacing: if _chart-row(line) { 0pt } else { par.leading }, line)).join()
 
 #let _hex-byte = range(256).map(b => ((if b < 16 { "0" } else { "" }) + str(b, base: 16), b)).to-dict()
 // a package can't read files outside its own dir, so the photo travels hex-encoded inside the payload

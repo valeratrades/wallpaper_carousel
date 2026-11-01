@@ -1,8 +1,9 @@
 {
   inputs = {
     v_flakes.url = "github:valeratrades/v_flakes?ref=v1.6";
+    snapshot_fonts.url = "github:valeratrades/snapshot_fonts?ref=release";
   };
-  outputs = { self, v_flakes }:
+  outputs = { self, v_flakes, snapshot_fonts }:
     let
       inherit (v_flakes) flake-utils pre-commit-hooks;
     in
@@ -22,6 +23,9 @@
             mkdir -p $out/local/wallpaper-carousel
             ln -s ${./src_typ} $out/local/wallpaper-carousel/0.1.0
           '';
+
+          # `overlay.typ` names both families; typst scans only these, as a full system scan costs ~1s per start
+          typstFontPaths = "${pkgs.dejavu_fonts}/share/fonts/truetype:${snapshot_fonts.packages.${system}.fill-levels}/share/fonts/truetype";
 
           rs = v_flakes.rs {
             inherit pkgs rust;
@@ -62,7 +66,8 @@
                 nativeBuildInputs = with pkgs; [ pkg-config makeWrapper typst ]; # the integration test compiles `examples/vision.typ`
 
                 TYPST_PACKAGE_PATH = "${typstPackages}";
-                TYPST_FONT_PATHS = "${pkgs.dejavu_fonts}/share/fonts/truetype";
+                TYPST_FONT_PATHS = typstFontPaths;
+                TYPST_IGNORE_SYSTEM_FONTS = "true";
 
                 cargoLock.lockFile = ./Cargo.lock;
                 src = pkgs.lib.cleanSource ./.;
@@ -74,7 +79,8 @@
                 postInstall = ''
                   wrapProgram $out/bin/${pname} \
                     --prefix PATH : ${pkgs.typst}/bin \
-                    --set TYPST_FONT_PATHS ${pkgs.dejavu_fonts}/share/fonts/truetype \
+                    --set TYPST_FONT_PATHS ${typstFontPaths} \
+                    --set TYPST_IGNORE_SYSTEM_FONTS true \
                     --set TYPST_PACKAGE_PATH ${typstPackages}
                 '';
               };
@@ -99,9 +105,10 @@
                 pkg-config
                 rust
                 typst
-                dejavu_fonts
               ] ++ pre-commit-check.enabledPackages ++ combined.enabledPackages;
 
+              env.TYPST_FONT_PATHS = typstFontPaths;
+              env.TYPST_IGNORE_SYSTEM_FONTS = "true";
               env.RUST_BACKTRACE = 1;
               env.RUST_LIB_BACKTRACE = 0;
             };
