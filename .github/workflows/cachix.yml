@@ -1,3 +1,6 @@
+concurrency:
+  cancel-in-progress: false
+  group: cachix
 jobs:
   build:
     name: build ${{ matrix.system }}
@@ -18,6 +21,14 @@ jobs:
             system: x86_64-linux
           - runner: ubuntu-24.04-arm
             system: aarch64-linux
+  cached:
+    needs: build
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: git push --force origin HEAD:refs/heads/cached
 name: cachix
 on:
   push:

@@ -94,9 +94,11 @@
      memory x result'';
       author = "Charlie Morgan";
     }
+
+    "incompetence may oftentimes resemble randomness"
   ];
   year_progress.enable = true;
-  balance = {
-    command = "fish -lc 'discretionary_engine risk balance'";
-  };
+  #balance = {
+  #  command = "fish -lc 'discretionary_engine risk balance'";
+  #};
 }
