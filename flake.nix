@@ -30,16 +30,17 @@
           rs = v_flakes.rs {
             inherit pkgs rust;
           };
+          oldestSupportedVersion = "nightly-2026-06-29";
           github = v_flakes.github {
             inherit pkgs pname rs;
             enable = true;
-            lastSupportedVersion = "nightly-2026-06-29";
+            inherit oldestSupportedVersion;
             jobs.default = true;
             publishCachix = "valeratrades";
           };
           readme = v_flakes.readme-fw {
             inherit pkgs pname;
-            lastSupportedVersion = "nightly-1.93";
+            inherit oldestSupportedVersion;
             rootDir = ./.;
             licenses = [{ license = v_flakes.files.licenses.gl; }];
             badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ];

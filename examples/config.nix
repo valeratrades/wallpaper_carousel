@@ -7,6 +7,8 @@
 
     { text = "iteration speed"; author = "Alex Hormozi"; }
 
+    "speed above all"
+
     { text = "fuck your mood\nfollow the plan"; author = "Leila Hormozi"; }
 
     { text = "when it gets easy\nis when you go hard"; author = "Alex Hormozi"; }
@@ -84,8 +86,6 @@
     "go at the limit to find and fix weaknesses" # weak points are evident under pressure. Have periods of overloading the system and plugging the wholes while you see where it leaks.
 
     "#40: despise the free lunch"
-
-    "#46: never appear too perfect"
 
     { text = ''
 󿾴󷛮󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󰧥󳵐󻡪
